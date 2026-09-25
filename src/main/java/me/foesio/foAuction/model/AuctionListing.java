@@ -69,6 +69,14 @@ public final class AuctionListing {
         return expiresAt <= nowMillis;
     }
 
+    public AuctionListing withItem(ItemStack replacement) {
+        if (item == null || replacement == null || replacement.getType().isAir()
+                || replacement.getAmount() <= 0 || replacement.getAmount() != item.getAmount()) {
+            throw new IllegalArgumentException("Replacement must preserve a positive item quantity");
+        }
+        return new AuctionListing(id, sellerUuid, replacement, price, createdAt, expiresAt);
+    }
+
     public AuctionListing copy() {
         return new AuctionListing(id, sellerUuid, item, price, createdAt, expiresAt);
     }

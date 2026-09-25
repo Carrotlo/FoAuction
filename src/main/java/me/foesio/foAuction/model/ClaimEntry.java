@@ -76,6 +76,14 @@ public final class ClaimEntry {
         return note;
     }
 
+    public ClaimEntry withItem(ItemStack replacement) {
+        if (item == null || replacement == null || replacement.getType().isAir()
+                || replacement.getAmount() <= 0 || replacement.getAmount() != item.getAmount()) {
+            throw new IllegalArgumentException("Replacement must preserve a positive item quantity");
+        }
+        return new ClaimEntry(id, type, replacement, money, createdAt, note);
+    }
+
     public ClaimEntry copy() {
         return new ClaimEntry(id, type, item, money, createdAt, note);
     }

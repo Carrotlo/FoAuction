@@ -12,6 +12,9 @@ public final class AuctionMainHolder implements InventoryHolder {
     private final UUID viewerUuid;
     private final int page;
     private final Inventory inventory;
+    private long itemRevision = Long.MIN_VALUE;
+    public long getItemRevision() { return itemRevision; }
+    public void setItemRevision(long revision) { itemRevision = revision; }
     private final Map<Integer, UUID> listingBySlot;
 
     public AuctionMainHolder(UUID viewerUuid, int page, String title) {

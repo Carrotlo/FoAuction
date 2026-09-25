@@ -43,7 +43,96 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public final class AuctionService {
+public final class AuctionService implements me.foesio.foAuction.api.StoredItemApi {
+    private long itemRevision;
+
+    public long getItemRevision() { synchronized (transactionLock) { return itemRevision; } }
+
+    private static void requireItemApiThread() {
+        if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("Stored item API requires the server thread");
+    }
+
+    @Override public java.util.Iterator<UUID> cachedOwners() {
+        requireItemApiThread();
+        return userDataRepository.getAllCached().stream().map(PlayerData::getUuid).iterator();
+    }
+
+    @Override public Page readItems(UUID owner, Kind kind, int offset, int limit) {
+        requireItemApiThread();
+        java.util.Objects.requireNonNull(owner); java.util.Objects.requireNonNull(kind);
+        if (offset < 0 || limit < 1 || limit > MAX_BATCH) throw new IllegalArgumentException("Invalid page bounds");
+        synchronized (transactionLock) {
+            PlayerData data = userDataRepository.getCached(owner);
+            if (data == null) return new Page(List.of(), offset, false);
+            int size = kind == Kind.LISTING ? data.getAuctions().size() : data.getClaims().size();
+            int end = (int)Math.min(size, (long)offset + limit);
+            List<StoredItem> items = new ArrayList<>();
+            for (int i = offset; i < end; i++) {
+                if (kind == Kind.LISTING) {
+                    AuctionListing entry = data.getAuctions().get(i);
+                    items.add(new StoredItem(kind, i, entry.getId(), entry.getItem()));
+                } else {
+                    ClaimEntry entry = data.getClaims().get(i);
+                    if (entry.getType() == ClaimEntry.Type.ITEM && entry.getItem() != null)
+                        items.add(new StoredItem(kind, i, entry.getId(), entry.getItem()));
+                }
+            }
+            return new Page(items, end, end < size);
+        }
+    }
+
+    @Override public List<Result> replaceItems(UUID owner, List<Replacement> replacements) {
+        requireItemApiThread();
+        java.util.Objects.requireNonNull(owner);
+        replacements = List.copyOf(replacements);
+        if (replacements.size() > MAX_BATCH) throw new IllegalArgumentException("Too many replacements");
+        synchronized (transactionLock) {
+            PlayerData data = userDataRepository.getCached(owner);
+            List<Result> results = new ArrayList<>();
+            boolean changed = false;
+            for (Replacement replacement : replacements) {
+                Result result = replaceStoredItem(data, replacement);
+                results.add(result);
+                changed |= result == Result.UPDATED;
+            }
+            if (changed) userDataRepository.saveAsync(owner);
+            return List.copyOf(results);
+        }
+    }
+
+    private Result replaceStoredItem(PlayerData data, Replacement replacement) {
+        StoredItem expected = replacement.expected();
+        ItemStack next = replacement.item();
+        if (expected == null || expected.kind() == null || expected.id() == null
+                || expected.index() < 0 || next.getType().isAir() || next.getAmount() <= 0
+                || next.getAmount() != expected.item().getAmount()) return Result.INVALID;
+        if (data == null) return Result.MISSING;
+        int index = expected.index();
+        if (expected.kind() == Kind.LISTING) {
+            if (index >= data.getAuctions().size()) return Result.MISSING;
+            AuctionListing old = data.getAuctions().get(index);
+            AuctionListing indexed = listingsById.get(expected.id());
+            if (!old.getId().equals(expected.id()) || !old.getItem().equals(expected.item())) return Result.STALE;
+            if (indexed == null) return Result.MISSING;
+            if (!indexed.getSellerUuid().equals(data.getUuid()) || !indexed.getItem().equals(old.getItem())) return Result.STALE;
+            if (pendingPurchaseTransactions.contains(expected.id())) return Result.BUSY;
+            if (old.getItem().equals(next)) return Result.UNCHANGED;
+            AuctionListing updated = old.withItem(next);
+            data.getAuctions().set(index, updated);
+            listingsById.put(old.getId(), updated.copy());
+            itemRevision++;
+        } else {
+            if (pendingClaimTransactions.contains(data.getUuid())) return Result.BUSY;
+            if (index >= data.getClaims().size()) return Result.MISSING;
+            ClaimEntry old = data.getClaims().get(index);
+            if (!old.getId().equals(expected.id()) || old.getType() != ClaimEntry.Type.ITEM
+                    || !java.util.Objects.equals(old.getItem(), expected.item())) return Result.STALE;
+            if (old.getItem().equals(next)) return Result.UNCHANGED;
+            data.getClaims().set(index, old.withItem(next));
+        }
+        return Result.UPDATED;
+    }
+
     private static final int MAX_BLACKLIST_SCAN_DEPTH = 4;
     private static final int MAX_BLACKLIST_SCAN_ITEMS = 128;
 
@@ -78,6 +167,7 @@ public final class AuctionService {
     private final Map<UUID, AuctionListing> listingsById;
     private final ConcurrentMap<UUID, String> searchQueryByViewer;
     private final Set<UUID> pendingPurchaseTransactions;
+    private final Set<UUID> pendingClaimTransactions = ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<UUID, Long> claimCooldowns;
     private final ConcurrentMap<UUID, Long> searchQueryTimestamps;
     private static final long CLAIM_COOLDOWN_MS = 1000L; // 1 second cooldown
@@ -370,6 +460,16 @@ public final class AuctionService {
     }
 
     public ClaimResult claim(Player player, UUID claimId) {
+        UUID owner = player.getUniqueId();
+        if (!pendingClaimTransactions.add(owner)) return ClaimResult.ON_COOLDOWN;
+        try {
+            return claimInternal(player, claimId);
+        } finally {
+            pendingClaimTransactions.remove(owner);
+        }
+    }
+
+    private ClaimResult claimInternal(Player player, UUID claimId) {
         UUID playerUuid = player.getUniqueId();
         long now = System.currentTimeMillis();
 
@@ -522,6 +622,11 @@ public final class AuctionService {
     }
 
     public PurchaseResult buyListing(Player buyer, UUID listingId) {
+        return buyListing(buyer, listingId, -1);
+    }
+
+    /** Pass the revision captured when rendering the purchase screen. */
+    public PurchaseResult buyListing(Player buyer, UUID listingId, long expectedRevision) {
         // Atomic transaction tracking - prevent concurrent purchases of same listing
         if (!pendingPurchaseTransactions.add(listingId)) {
             return PurchaseResult.TRANSACTION_IN_PROGRESS;
@@ -529,6 +634,7 @@ public final class AuctionService {
 
         try {
             synchronized (transactionLock) {
+                if (expectedRevision != -1 && expectedRevision != itemRevision) return PurchaseResult.ITEM_CHANGED;
                 // Double-check that listing still exists and is valid
                 AuctionListing listing = listingsById.get(listingId);
                 if (listing == null) {
@@ -1399,6 +1505,7 @@ public final class AuctionService {
     }
 
     public enum PurchaseResult {
+        ITEM_CHANGED,
         SUCCESS_INVENTORY,
         SUCCESS_CLAIMS,
         SUCCESS_PARTIAL_CLAIMS,

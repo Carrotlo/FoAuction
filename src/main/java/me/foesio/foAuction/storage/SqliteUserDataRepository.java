@@ -129,6 +129,11 @@ public final class SqliteUserDataRepository implements IUserDataRepository {
         return cache.computeIfAbsent(uuid, this::loadPlayerData);
     }
 
+    @Override
+    public PlayerData getCached(UUID owner) {
+        return cache.get(owner);
+    }
+
     public Collection<PlayerData> getAllCached() {
         return cache.values();
     }

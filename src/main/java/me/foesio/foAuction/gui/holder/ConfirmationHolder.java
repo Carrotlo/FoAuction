@@ -20,6 +20,9 @@ public final class ConfirmationHolder implements InventoryHolder {
     private final int returnPage;
     private final UUID sellerUuid;
     private final Inventory inventory;
+    private long itemRevision = Long.MIN_VALUE;
+    public long getItemRevision() { return itemRevision; }
+    public void setItemRevision(long revision) { itemRevision = revision; }
 
     private ConfirmationHolder(
             UUID playerUuid,

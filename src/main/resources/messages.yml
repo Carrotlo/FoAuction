@@ -72,6 +72,7 @@ editor:
   search-cleared: "{prefix}{good}Search cleared."
 
 gui:
+  item-updated: "{warn}Auction items were updated. Review the refreshed listing before buying."
   slow-down: "{prefix}{bad}Please slow down."
   refresh-cooldown: "{prefix}{bad}Refresh cooldown: {muted}{time}ms"
   own-listing: "{prefix}{bad}This is your listing. {muted}Use Manage Auctions to cancel it."

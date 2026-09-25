@@ -172,6 +172,7 @@ public final class AuctionGuiManager {
                 page,
                   title(player, "main.yml", "title", MAIN_GUI_TITLE)
           );
+        holder.setItemRevision(auctionService.getItemRevision());
         Inventory inventory = holder.getInventory();
 
         Material frameMaterial = guiConfig.fillerMaterial("main.yml", Material.GRAY_STAINED_GLASS_PANE);
@@ -350,6 +351,7 @@ public final class AuctionGuiManager {
                 + " "
                 + (page + 1);
         SellerViewHolder holder = new SellerViewHolder(viewer.getUniqueId(), sellerUuid, page, title);
+        holder.setItemRevision(auctionService.getItemRevision());
         Inventory inventory = holder.getInventory();
         boolean adminView = viewer.hasPermission("foauction.admin");
 
@@ -1251,6 +1253,7 @@ public final class AuctionGuiManager {
                   sellerUuid,
                   title(player, "confirmation.yml", "buy-title", CONFIRMATION_TITLE)
           );
+        holder.setItemRevision(auctionService.getItemRevision());
         Inventory inventory = holder.getInventory();
 
         ItemStack displayItem = listing.getItem().clone();

@@ -82,6 +82,12 @@ public final class FoAuction extends JavaPlugin {
     private volatile boolean periodicSaveCancelled;
     private volatile boolean periodicSaveScheduled;
 
+    /** Available after successful enable; integrations must depend/softdepend on FoAuction. */
+    public me.foesio.foAuction.api.StoredItemApi getStoredItemApi() {
+        if (!isEnabled() || auctionService == null) throw new IllegalStateException("FoAuction is not ready");
+        return auctionService;
+    }
+
     public static FoFileLogger fileLogger() {
         return activeFileLogger;
     }
@@ -547,6 +553,7 @@ public final class FoAuction extends JavaPlugin {
 
       private boolean backfillEditorMessageDefaults(FileConfiguration config) {
           boolean changed = false;
+          changed |= ensureMessage(config, "gui.item-updated", "{warn}Auction items were updated. Review the refreshed listing before buying.");
           changed |= ensureMessage(config, "editor.opened", "{prefix}Opening admin editor.");
           changed |= ensureMessage(config, "editor.only-players", "{prefix}{bad}Only players can open the editor.");
           changed |= ensureMessage(config, "editor.prompt", "{prefix}Type {theme}{field}{muted}. Format: {theme}{format}{muted}. Type {bad}cancel{muted} to cancel.");

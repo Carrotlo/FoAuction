@@ -13,8 +13,14 @@ import java.util.function.Consumer;
 public interface IUserDataRepository {
     
     /**
-     * Loads all user data from disk/database into cache.
+     * Looks up cached data without disk access. Storage implementations should override
+     * this default with a direct cache lookup.
      */
+    default PlayerData getCached(UUID owner) {
+        return getAllCached().stream().filter(data -> data.getUuid().equals(owner)).findFirst().orElse(null);
+    }
+
+    /** Loads all user data from disk/database into cache. */
     void loadAllFromDisk();
     
     /**

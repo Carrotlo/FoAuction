@@ -212,7 +212,7 @@ public final class GuiListener implements Listener {
                 return;
             }
 
-            AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId);
+            AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId, holder.getItemRevision());
             handlePurchaseResult(player, result);
 
             reopenMain(player, holder.getPage());
@@ -420,7 +420,7 @@ public final class GuiListener implements Listener {
                 return;
             }
 
-            AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId);
+            AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId, holder.getItemRevision());
             handlePurchaseResult(player, result);
 
             runNextTick(() -> guiManager.openSellerViewGui(player, holder.getSellerUuid(), holder.getPage()));
@@ -732,6 +732,10 @@ public final class GuiListener implements Listener {
                 message(player, "gui.listing-expired");
                 SoundFeedback.denied(player);
             }
+            case ITEM_CHANGED -> {
+                message(player, "gui.item-updated");
+                SoundFeedback.denied(player);
+            }
             case NOT_FOUND -> {
                 message(player, "gui.listing-unavailable");
                 SoundFeedback.denied(player);
@@ -830,7 +834,7 @@ public final class GuiListener implements Listener {
         }
 
         SoundFeedback.confirm(player);
-        AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId);
+        AuctionService.PurchaseResult result = auctionService.buyListing(player, listingId, holder.getItemRevision());
         handlePurchaseResult(player, result);
         reopenAfterBuyConfirmation(player, holder);
     }

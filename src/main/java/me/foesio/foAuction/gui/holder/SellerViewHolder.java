@@ -13,6 +13,9 @@ public final class SellerViewHolder implements InventoryHolder {
     private final UUID sellerUuid;
     private final int page;
     private final Inventory inventory;
+    private long itemRevision = Long.MIN_VALUE;
+    public long getItemRevision() { return itemRevision; }
+    public void setItemRevision(long revision) { itemRevision = revision; }
     private final Map<Integer, UUID> listingBySlot;
 
     public SellerViewHolder(UUID viewerUuid, UUID sellerUuid, int page, String title) {
