@@ -13,6 +13,70 @@ tokens:
   good: "#3ecf8e"
   bad: "#ff5d73"
 
+# Labels supplied to Core's sort/filter cycle controls. Order follows the gameplay modes.
+gui-options:
+  main:
+    sort: ["Highest Price", "Lowest Price", "Most Recent", "Least Recent"]
+    filter: ["All", "Weapons", "Armor", "Tools", "Blocks", "Food", "Farm", "Redstone", "Potions", "Misc"]
+  listings:
+    sort: ["Highest Price", "Lowest Price", "Most Recent", "Least Recent"]
+  seller-view:
+    sort: ["Highest Price", "Lowest Price", "Most Recent", "Least Recent"]
+
+gui-values:
+  no-search: "{muted}None"
+  search-target: "auctions"
+  time-expired: "Expired"
+  time-days-hours: "{days}d {hours}h"
+  time-hours-minutes: "{hours}h {minutes}m"
+  time-minutes: "{minutes}m"
+  date-format: "yyyy-MM-dd HH:mm"
+  date-zone: "system"
+  number-locale: "en-US"
+  number-pattern: "#,##0.####"
+  compact-number-pattern: "0.00"
+  compact-suffixes: ["K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td"]
+  container: "Container"
+  generic-item: "item"
+  containers:
+    barrel: "Barrel"
+    bundle: "Bundle"
+    shulker_box: "Shulker Box"
+    white_shulker_box: "White Shulker Box"
+    orange_shulker_box: "Orange Shulker Box"
+    magenta_shulker_box: "Magenta Shulker Box"
+    light_blue_shulker_box: "Light Blue Shulker Box"
+    yellow_shulker_box: "Yellow Shulker Box"
+    lime_shulker_box: "Lime Shulker Box"
+    pink_shulker_box: "Pink Shulker Box"
+    gray_shulker_box: "Gray Shulker Box"
+    light_gray_shulker_box: "Light Gray Shulker Box"
+    cyan_shulker_box: "Cyan Shulker Box"
+    purple_shulker_box: "Purple Shulker Box"
+    blue_shulker_box: "Blue Shulker Box"
+    brown_shulker_box: "Brown Shulker Box"
+    green_shulker_box: "Green Shulker Box"
+    red_shulker_box: "Red Shulker Box"
+    black_shulker_box: "Black Shulker Box"
+
+claim-notes:
+  claim-delivery-fallback: "Claim delivery fallback"
+  purchased-from: "Purchased from {seller}"
+  admin-removed: "Admin removed listing"
+  listing-expired: "Listing expired"
+  inventory-full: "Inventory full fallback"
+  player-offline: "Player offline"
+
+validation-errors:
+  price-empty: "Price cannot be empty"
+  price-too-low: "Price is below the supported minimum"
+  price-too-high: "Price exceeds the supported maximum"
+  price-format: "Use a price such as 500, 50K, or 1.5M"
+  search-too-long: "Search query exceeds {max} characters"
+  player-empty: "Player name cannot be empty"
+  player-format: "Invalid player name format"
+  invalid-input: "Invalid input"
+
 command:
   no-permission: "{prefix}{bad}You do not have permission."
   usage: "{prefix}Usage: {theme}/{label} [sell <price>|claims|search <text>|view [player]]"
@@ -72,6 +136,10 @@ editor:
   search-cleared: "{prefix}{good}Search cleared."
 
 gui:
+  unavailable: "{prefix}{bad}Auction menus are temporarily unavailable. Please ask an admin to check the GUI configuration."
+  search-chat-prompt: "{prefix}Type a search in chat. Type {theme}{cancel}{muted} to cancel or {theme}{clear}{muted} to clear the search."
+  search-chat-cancel-keyword: "cancel"
+  search-chat-clear-keyword: "clear"
   slow-down: "{prefix}{bad}Please slow down."
   refresh-cooldown: "{prefix}{bad}Refresh cooldown: {muted}{time}ms"
   own-listing: "{prefix}{bad}This is your listing. {muted}Use Manage Auctions to cancel it."

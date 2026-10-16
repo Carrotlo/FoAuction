@@ -15,4 +15,13 @@ confirm-button: "{good}Search"
 cancel-button: "{bad}Cancel"
 confirm-tooltip: "{muted}Apply this search."
 cancel-tooltip: "{muted}Return without changing search."
+confirm-icon: "spyglass"
+cancel-icon: "barrier"
+confirm-width: 120
+cancel-width: 120
+body-width: 320
+input-width: 300
 max-length: 100
+label-visible: true
+can-close-with-escape: true
+pause: false

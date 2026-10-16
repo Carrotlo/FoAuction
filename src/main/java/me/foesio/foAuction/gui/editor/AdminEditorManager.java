@@ -131,7 +131,7 @@ public final class AdminEditorManager {
         inventory.setItem(10, button(player, Material.SUNFLOWER, "Auction", List.of(
                 white("Prices, slots, fees, expiry")
         ), ColorPalette.THEME_COLOR, true));
-        inventory.setItem(12, button(player, Material.CHEST, "GUI", List.of(
+        inventory.setItem(12, button(player, Material.CHEST_MINECART, "GUI", List.of(
                 white("Confirmation and refresh settings")
         ), ColorPalette.THEME_COLOR, true));
         inventory.setItem(MAIN_BLACKLIST_SLOT, button(player, Material.BARRIER, "Blacklists", List.of(
@@ -153,7 +153,7 @@ public final class AdminEditorManager {
         inventory.setItem(AUCTION_MIN_PRICE_SLOT, valueButton(player, Material.SUNFLOWER, "Minimum Price", formatPrice(settings.getMinPrice()), "Money amount"));
         inventory.setItem(AUCTION_MAX_PRICE_SLOT, valueButton(player, Material.EMERALD, "Maximum Price", formatPrice(settings.getMaxPrice()), "Money amount"));
         inventory.setItem(AUCTION_FEE_SLOT, valueButton(player, Material.GOLD_INGOT, "Listing Fee", settings.getListingFeePercent() + "%", "Percent 0-100"));
-        inventory.setItem(AUCTION_SLOTS_SLOT, valueButton(player, Material.CHEST, "Default Slots", String.valueOf(settings.getDefaultMaxSlots()), "Whole number"));
+        inventory.setItem(AUCTION_SLOTS_SLOT, valueButton(player, Material.CHEST_MINECART, "Default Slots", String.valueOf(settings.getDefaultMaxSlots()), "Whole number"));
         inventory.setItem(AUCTION_EXPIRE_SLOT, valueButton(player, Material.CLOCK, "Expire Days", String.valueOf(settings.getExpireDays()), "1-30 days"));
         inventory.setItem(AUCTION_BACK_SLOT, GuiButtons.back(player));
 

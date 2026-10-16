@@ -1,19 +1,18 @@
-# Seller listing browser GUI. Slots are 0-based Minecraft inventory slots.
-title: "ᴠɪᴇᴡɪɴɢ"
-content-slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43]
-items:
-  previous:
-    slot: 45
-    name: ":arrow: {theme}&lPREVIOUS PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Previous Page ←"
+title: "ᴠɪᴇᴡɪɴɢ {seller} | ᴘᴀɢᴇ {page}"
+rows: 6
+filler:
+  enabled: true
+  material: "GRAY_STAINED_GLASS_PANE"
+  name: " "
+  lore: []
+  item-flags:
+    - "HIDE_ATTRIBUTES"
+    - "HIDE_ENCHANTS"
+buttons:
   back:
     slot: 49
+    enabled: true
+    material: "IRON_DOOR"
     name: ":iron_door: {theme}&lBACK"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -22,19 +21,36 @@ items:
       - "&7&l | &fReturn to the previous menu."
       - " "
       - "{good}→ Click to Go Back ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "seller-view.back"
   sort:
     slot: 47
-    material: HOPPER
+    enabled: true
+    material: "HOPPER"
     name: ":hopper: {theme}&lSORT"
-    # Labels only. FoPluginCore keeps the colors and selection markers fixed.
-    lore-options:
-      - "Highest Price"
-      - "Lowest Price"
-      - "Most Recent"
-      - "Least Recent"
+    lore:
+      - "&8ʙᴜᴛᴛᴏɴ"
+      - " "
+      - "&eⓘ Information ↓"
+      - "&7&l | &fOptions:"
+      - "{options}"
+      - " "
+      - "{good}→ Click to Cycle ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "seller-view.sort"
+    cycle:
+      selected-format: "&7&l | {theme}» {option}"
+      unselected-format: "&7&l | {white}• {option}"
   refresh:
     slot: 48
-    material: MAP
+    enabled: true
+    material: "MAP"
     name: ":map: {theme}&lREFRESH"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -43,13 +59,128 @@ items:
       - "&7&l | &fRefresh your listings."
       - " "
       - "{good}→ Click to Refresh ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "seller-view.refresh"
+entries:
+  listings:
+    slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+    source-item:
+      lore-states:
+        buy:
+          mode: "append"
+          lines:
+            - ""
+            - "{muted}Seller: {theme}{seller}"
+            - "{muted}Price: {theme}{price}"
+            - "{muted}Time Left: {theme}{time_left}"
+            - ""
+            - "{theme}Click to buy"
+        buy-admin:
+          mode: "append"
+          lines:
+            - ""
+            - "{muted}Seller: {theme}{seller}"
+            - "{muted}Price: {theme}{price}"
+            - "{muted}Time Left: {theme}{time_left}"
+            - ""
+            - "{theme}Click to buy"
+            - "{muted}Press Drop Key: {theme}Admin remove options"
+        container:
+          mode: "append"
+          lines:
+            - ""
+            - "{muted}Seller: {theme}{seller}"
+            - "{muted}Price: {theme}{price}"
+            - "{muted}Time Left: {theme}{time_left}"
+            - ""
+            - "{theme}Left Click to buy"
+            - "{theme}Right Click to preview"
+        container-admin:
+          mode: "append"
+          lines:
+            - ""
+            - "{muted}Seller: {theme}{seller}"
+            - "{muted}Price: {theme}{price}"
+            - "{muted}Time Left: {theme}{time_left}"
+            - ""
+            - "{theme}Left Click to buy"
+            - "{theme}Right Click to preview"
+            - "{muted}Press Drop Key: {theme}Admin remove options"
+    actions:
+      left: "listing.select"
+      right: "listing.preview"
+      shift-left: "listing.select"
+      shift-right: "listing.preview"
+      drop: "listing.admin"
+      control-drop: "listing.admin"
+  previous:
+    slots:
+      - 45
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lPREVIOUS PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Previous Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "seller-view.previous"
+      right: "seller-view.previous"
   next:
-    slot: 53
-    name: ":arrow: {theme}&lNEXT PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Next Page ←"
+    slots:
+      - 53
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lNEXT PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Next Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "seller-view.next"
+      right: "seller-view.next"

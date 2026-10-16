@@ -1,13 +1,12 @@
-# Buy/sell confirmation GUI.
-# Placeholders in confirm/cancel lore: {price}, {fee}
-sell-title: "ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ"
-buy-title: "ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ"
-items:
-  preview:
-    slot: 13
+title: "ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ"
+rows: 3
+filler:
+  enabled: false
+buttons:
   cancel:
     slot: 11
-    material: RED_STAINED_GLASS_PANE
+    enabled: true
+    material: "RED_STAINED_GLASS_PANE"
     name: ":red_stained_glass_pane: {bad}&lCANCEL"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -17,9 +16,15 @@ items:
       - "&7&l | &fFee: {theme}{fee}"
       - " "
       - "{good}→ Click to Cancel ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "confirmation.cancel"
   confirm:
     slot: 15
-    material: LIME_STAINED_GLASS_PANE
+    enabled: true
+    material: "LIME_STAINED_GLASS_PANE"
     name: ":lime_stained_glass_pane: {good}&lCONFIRM"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -29,13 +34,19 @@ items:
       - "&7&l | &fFee: {theme}{fee}"
       - " "
       - "{good}→ Click to Confirm Purchase ←"
-
-# Lore added to the item preview. The item name/lore supplied by the player or listing stays untouched.
-preview-lore:
-  separator: ""
-  sell:
-    - "{white}Selling for: {theme}{price}"
-    - "{white}Listing fee: {theme}{fee}"
-  buy:
-    - "{white}Seller: {theme}{seller}"
-    - "{white}Buying for: {theme}{price}"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "confirmation.confirm"
+entries:
+  preview:
+    slots:
+      - 13
+    source-item:
+      lore:
+        mode: "append"
+        lines:
+          - ""
+          - "{white}Seller: {theme}{seller}"
+          - "{white}Buying for: {theme}{price}"

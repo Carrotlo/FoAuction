@@ -1,19 +1,18 @@
-# Claim box GUI. Money claims remain for older data; new sales pay sellers directly.
-title: "ᴄʟᴀɪᴍ ʙᴏx"
-content-slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34]
-items:
-  previous:
-    slot: 45
-    name: ":arrow: {theme}&lPREVIOUS PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Previous Page ←"
+title: "ᴄʟᴀɪᴍ ʙᴏx | ᴘᴀɢᴇ {page}"
+rows: 6
+filler:
+  enabled: true
+  material: "GRAY_STAINED_GLASS_PANE"
+  name: " "
+  lore: []
+  item-flags:
+    - "HIDE_ATTRIBUTES"
+    - "HIDE_ENCHANTS"
+buttons:
   back:
     slot: 49
+    enabled: true
+    material: "IRON_DOOR"
     name: ":iron_door: {theme}&lBACK"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -22,9 +21,15 @@ items:
       - "&7&l | &fReturn to the previous menu."
       - " "
       - "{good}→ Click to Go Back ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "claims.back"
   refresh:
     slot: 48
-    material: MAP
+    enabled: true
+    material: "MAP"
     name: ":map: {theme}&lREFRESH"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -33,32 +38,130 @@ items:
       - "&7&l | &fRefresh your claim box."
       - " "
       - "{good}→ Click to Refresh ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "claims.refresh"
+entries:
+  previous:
+    slots:
+      - 45
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lPREVIOUS PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Previous Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "claims.previous"
+      right: "claims.previous"
   next:
-    slot: 53
-    name: ":arrow: {theme}&lNEXT PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Next Page ←"
-
-# Text appended to claim entries. Names/lore of the claimed item itself stay untouched.
-claim-entry:
-  separator: ""
-  action-separator: ""
-  item:
-    note: "{white}Note: {theme}{note}"
-    created: "{white}Created: {theme}{created}"
-    action: "{white}Click to claim this item"
+    slots:
+      - 53
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lNEXT PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Next Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "claims.next"
+      right: "claims.next"
+  claims:
+    slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+    source-item:
+      lore-states:
+        item:
+          mode: "append"
+          lines:
+            - ""
+            - "{white}Created: {theme}{created}"
+            - ""
+            - "{white}Click to claim this item"
+        item-note:
+          mode: "append"
+          lines:
+            - ""
+            - "{white}Note: {theme}{note}"
+            - "{white}Created: {theme}{created}"
+            - ""
+            - "{white}Click to claim this item"
+        money:
+          mode: "preserve"
+        money-note:
+          mode: "preserve"
+        invalid:
+          mode: "preserve"
+    empty-item:
+      material: "LIGHT_GRAY_STAINED_GLASS_PANE"
+      name: " "
+      lore: []
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "claims.claim"
+      right: "claims.claim"
+      shift-left: "claims.claim"
+      shift-right: "claims.claim"
+states:
   money:
+    material: "SUNFLOWER"
     name: "{theme}ᴄʟᴀɪᴍ ᴍᴏɴᴇʏ"
-    amount: "{white}Amount: {theme}{amount}"
-    note: "{white}Note: {theme}{note}"
-    created: "{white}Created: {theme}{created}"
-    action: "{white}Click to claim this money"
+    lore:
+      - "{white}Amount: {theme}{amount}"
+      - "{white}Created: {theme}{created}"
+      - ""
+      - "{white}Click to claim this money"
+  money-note:
+    material: "SUNFLOWER"
+    name: "{theme}ᴄʟᴀɪᴍ ᴍᴏɴᴇʏ"
+    lore:
+      - "{white}Amount: {theme}{amount}"
+      - "{white}Note: {theme}{note}"
+      - "{white}Created: {theme}{created}"
+      - ""
+      - "{white}Click to claim this money"
   invalid:
+    material: "BARRIER"
     name: "{bad}ɪɴᴠᴀʟɪᴅ ᴄʟᴀɪᴍ"
     lore:
       - "{white}This claim cannot be delivered."

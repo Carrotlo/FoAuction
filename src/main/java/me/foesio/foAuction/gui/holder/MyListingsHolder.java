@@ -11,12 +11,14 @@ import java.util.UUID;
 public final class MyListingsHolder implements InventoryHolder {
     private final UUID viewerUuid;
     private final int page;
+    private final int maxPage;
     private final Inventory inventory;
     private final Map<Integer, UUID> listingBySlot;
 
-    public MyListingsHolder(UUID viewerUuid, int page, String title) {
+    public MyListingsHolder(UUID viewerUuid, int page, int maxPage, String title) {
         this.viewerUuid = viewerUuid;
         this.page = page;
+        this.maxPage = maxPage;
         this.inventory = Bukkit.createInventory(this, 54, title);
         this.listingBySlot = new HashMap<>();
     }
@@ -27,6 +29,10 @@ public final class MyListingsHolder implements InventoryHolder {
 
     public int getPage() {
         return page;
+    }
+
+    public int getMaxPage() {
+        return maxPage;
     }
 
     public void mapSlot(int slot, UUID listingId) {

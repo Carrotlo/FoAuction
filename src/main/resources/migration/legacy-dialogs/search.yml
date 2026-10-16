@@ -1,0 +1,18 @@
+# Native dialog shown when a player clicks auction search.
+# Valid placeholders: {current}
+# Leave input empty to clear the current search.
+# Fallback: unsupported servers use the existing chat prompt.
+
+title: "{theme}Search Auctions"
+body:
+  - "{muted}Enter item text to search listings."
+  - "{muted}Leave empty to clear the current search."
+field-label: "{white}Search text"
+# Paper text inputs use this as the initial/default text.
+initial-value: "{current}"
+placeholder: "{current}"
+confirm-button: "{good}Search"
+cancel-button: "{bad}Cancel"
+confirm-tooltip: "{muted}Apply this search."
+cancel-tooltip: "{muted}Return without changing search."
+max-length: 100

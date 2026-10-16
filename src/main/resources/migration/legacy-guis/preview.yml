@@ -1,0 +1,15 @@
+# Container preview GUI. Content slots mirror container contents.
+title: "ᴘʀᴇᴠɪᴇᴡɪɴɢ"
+items:
+  preview:
+    slot: 4
+  back:
+    slot: 40
+    name: ":iron_door: {theme}&lBACK"
+    lore:
+      - "&8ʙᴜᴛᴛᴏɴ"
+      - " "
+      - "&eⓘ Information ↓"
+      - "&7&l | &fReturn to the previous menu."
+      - " "
+      - "{good}→ Click to Go Back ←"

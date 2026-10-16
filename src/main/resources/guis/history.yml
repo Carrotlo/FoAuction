@@ -1,19 +1,18 @@
-# Sold history GUI. Slots are 0-based Minecraft inventory slots.
-title: "ʜɪꜱᴛᴏʀʏ"
-content-slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34]
-items:
-  previous:
-    slot: 45
-    name: ":arrow: {theme}&lPREVIOUS PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Previous Page ←"
+title: "ʜɪꜱᴛᴏʀʏ | {seller} | ᴘᴀɢᴇ {page}"
+rows: 6
+filler:
+  enabled: true
+  material: "GRAY_STAINED_GLASS_PANE"
+  name: " "
+  lore: []
+  item-flags:
+    - "HIDE_ATTRIBUTES"
+    - "HIDE_ENCHANTS"
+buttons:
   back:
     slot: 49
+    enabled: true
+    material: "IRON_DOOR"
     name: ":iron_door: {theme}&lBACK"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -22,27 +21,99 @@ items:
       - "&7&l | &fReturn to the previous menu."
       - " "
       - "{good}→ Click to Go Back ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "history.back"
+entries:
+  previous:
+    slots:
+      - 45
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lPREVIOUS PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Previous Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "history.previous"
+      right: "history.previous"
   next:
-    slot: 53
-    name: ":arrow: {theme}&lNEXT PAGE"
-    lore:
-      - "&8ʙᴜᴛᴛᴏɴ"
-      - " "
-      - "&eⓘ Information ↓"
-      - "&7&l | &fPage {page}/{max_page}."
-      - " "
-      - "{good}→ Click to Next Page ←"
+    slots:
+      - 53
+    item:
+      material: "ARROW"
+      name: ":arrow: {theme}&lNEXT PAGE"
+      lore:
+        - "&8ʙᴜᴛᴛᴏɴ"
+        - " "
+        - "&eⓘ Information ↓"
+        - "&7&l | &fPage {page}/{max_page}."
+        - " "
+        - "{good}→ Click to Next Page ←"
+      glow: true
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
+    actions:
+      left: "history.next"
+      right: "history.next"
+  history:
+    slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+    source-item:
+      lore:
+        mode: "append"
+        lines:
+          - ""
+          - "{muted}Seller: {theme}{seller}"
+          - "{muted}Buyer: {theme}{buyer}"
+          - "{muted}Price: {theme}{price}"
+          - "{muted}Sold: {theme}{sold}"
+    empty-item:
+      material: "LIGHT_GRAY_STAINED_GLASS_PANE"
+      name: " "
+      lore: []
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"
   empty:
-    slot: 4
-    material: PAPER
-    name: "{muted}ɴᴏ ʜɪꜱᴛᴏʀʏ ʏᴇᴛ"
-    lore:
-      - "{white}No sold listings were found"
-
-# Text appended to sold-history entries. The original item name/lore stays untouched.
-entry-lore:
-  separator: ""
-  seller: "{muted}Seller: {theme}{seller}"
-  buyer: "{muted}Buyer: {theme}{buyer}"
-  price: "{muted}Price: {theme}{price}"
-  sold: "{muted}Sold: {theme}{sold}"
+    slots:
+      - 4
+    item:
+      material: "PAPER"
+      name: "{muted}ɴᴏ ʜɪꜱᴛᴏʀʏ ʏᴇᴛ"
+      lore:
+        - "{white}No sold listings were found"
+      item-flags:
+        - "HIDE_ATTRIBUTES"
+        - "HIDE_ENCHANTS"

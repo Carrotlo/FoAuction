@@ -1,0 +1,26 @@
+# Manage Auctions GUI. Slots are 0-based Minecraft inventory slots.
+title: "Manage Auctions"
+content-slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43]
+items:
+  previous:
+    slot: 45
+    material: ARROW
+  back:
+    slot: 46
+    material: ARROW
+    name: "{theme}ʙᴀᴄᴋ"
+    lore:
+      - "{white}Return to auction house"
+  sort:
+    slot: 47
+    material: HOPPER
+    name: "{theme}ꜱᴏʀᴛ"
+  refresh:
+    slot: 49
+    material: MAP
+    name: "{theme}ʀᴇꜰʀᴇꜱʜ"
+    lore:
+      - "{white}Reload your listings"
+  next:
+    slot: 53
+    material: ARROW

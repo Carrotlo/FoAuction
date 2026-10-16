@@ -55,10 +55,10 @@ public final class AuctionSettings {
         applyDefaults(config);
         config.options().copyDefaults(true);
         migrateLegacyListingFee(config);
-        
+
         // Validate configuration values and apply bounds
         validateAndApplyConfigValues(config);
-        
+
         plugin.saveConfig();
     }
 
@@ -276,10 +276,10 @@ public final class AuctionSettings {
         // Price settings validation with bounds
         double configuredMinPrice = getFinitePrice(config, "auction.min-price", ABSOLUTE_MIN_PRICE);
         minPrice = Math.max(ABSOLUTE_MIN_PRICE, Math.min(configuredMinPrice, ABSOLUTE_MAX_PRICE));
-        
+
         double configuredMaxPrice = getFinitePrice(config, "auction.max-price", ABSOLUTE_MAX_PRICE);
         maxPrice = Math.max(minPrice, Math.min(configuredMaxPrice, ABSOLUTE_MAX_PRICE));
-        
+
         // Ensure min price is less than max price
         if (minPrice >= maxPrice) {
             plugin.getLogger().warning(ColorPalette.log("Min price (" + minPrice + ") is greater than or equal to max price (" + maxPrice + "). Using defaults."));
@@ -301,7 +301,7 @@ public final class AuctionSettings {
         // Slots validation
         defaultMaxSlots = Math.max(1, config.getInt("auction.default-max-slots", 3));
         config.set("auction.default-max-slots", defaultMaxSlots);
-        
+
         // Cooldown validation
         guiRefreshCooldownMillis = Math.max(0L, config.getLong("gui.refresh-cooldown-millis", 500L));
         config.set("gui.refresh-cooldown-millis", guiRefreshCooldownMillis);
@@ -342,7 +342,7 @@ public final class AuctionSettings {
         } else {
             discordWebhookUrl = "";
         }
-        
+
         discordWebhookSellingEnabled = config.getBoolean("discord-webhook.selling", true);
         discordWebhookListingEnabled = config.getBoolean("discord-webhook.listing", true);
         discordWebhookAdminRemovingEnabled = config.getBoolean("discord-webhook.admin-removing", true);

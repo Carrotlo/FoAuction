@@ -172,7 +172,7 @@ public final class AuctionService {
 
         searchQueryByViewer.put(playerUuid, normalized);
         searchQueryTimestamps.put(playerUuid, System.currentTimeMillis());
-        
+
         // Cleanup expired search queries periodically
         cleanupExpiredSearchQueries();
     }
@@ -404,7 +404,7 @@ public final class AuctionService {
                         playerUuid,
                         player,
                         item,
-                        claimEntry.getNote().isBlank() ? "Claim delivery fallback" : claimEntry.getNote()
+                        claimEntry.getNote().isBlank() ? "@foauction:claim-delivery-fallback" : claimEntry.getNote()
                 );
                 userDataRepository.saveNow(playerUuid);
 
@@ -589,7 +589,7 @@ public final class AuctionService {
                         buyer.getUniqueId(),
                         buyer,
                         listing.getItem(),
-                        "Purchased from " + resolvePlayerName(listing.getSellerUuid())
+                        "@foauction:purchased-from:" + listing.getSellerUuid()
                 );
                 recordSoldListingInternal(listing, buyer.getUniqueId(), System.currentTimeMillis());
                 notifySellerOfSale(listing, buyer);
@@ -677,7 +677,7 @@ public final class AuctionService {
         if (admin == null || !admin.hasPermission("foauction.admin")) {
             return AdminActionResult.NO_PERMISSION;
         }
-        
+
         // Additional permission check for specific admin action
         if (!admin.hasPermission("foauction.admin.return")) {
             return AdminActionResult.INSUFFICIENT_PERMISSION;
@@ -695,12 +695,12 @@ public final class AuctionService {
             }
 
             removeListingInternal(listing);
-            addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "Admin removed listing");
+            addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "@foauction:admin-removed");
             userDataRepository.saveNow(listing.getSellerUuid());
 
             Player seller = Bukkit.getPlayer(listing.getSellerUuid());
             if (seller != null) {
-                messages.sendConfigured(seller, "auction.admin-removed-notification");
+                sendOwnerMessage(seller, "auction.admin-removed-notification");
                 SoundFeedback.listingRemoved(seller);
             }
 
@@ -735,7 +735,7 @@ public final class AuctionService {
         if (admin == null || !admin.hasPermission("foauction.admin")) {
             return AdminActionResult.NO_PERMISSION;
         }
-        
+
         // Additional permission check for specific admin action
         if (!admin.hasPermission("foauction.admin.take")) {
             return AdminActionResult.INSUFFICIENT_PERMISSION;
@@ -902,11 +902,17 @@ public final class AuctionService {
     }
 
     public String getSortModeName(UUID playerUuid) {
-        return userDataRepository.getOrCreate(playerUuid).getSortMode().getDisplayName();
+        List<String> labels = me.foesio.foAuction.utils.OwnerMessages.optionalList(
+                messages, "gui-options.main.sort");
+        int selected = userDataRepository.getOrCreate(playerUuid).getSortMode().ordinal();
+        return selected < labels.size() ? labels.get(selected) : "";
     }
 
     public String getFilterModeName(UUID playerUuid) {
-        return userDataRepository.getOrCreate(playerUuid).getFilterMode().getDisplayName();
+        List<String> labels = me.foesio.foAuction.utils.OwnerMessages.optionalList(
+                messages, "gui-options.main.filter");
+        int selected = userDataRepository.getOrCreate(playerUuid).getFilterMode().ordinal();
+        return selected < labels.size() ? labels.get(selected) : "";
     }
 
     public double getMinPrice() {
@@ -938,12 +944,12 @@ public final class AuctionService {
 
     private void expireListingInternal(AuctionListing listing, boolean notifyPlayer) {
         removeListingInternal(listing);
-        addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "Listing expired");
+        addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "@foauction:listing-expired");
         userDataRepository.saveNow(listing.getSellerUuid());
 
         Player seller = Bukkit.getPlayer(listing.getSellerUuid());
         if (notifyPlayer && seller != null) {
-            messages.sendConfigured(seller, "auction.expired-notification");
+            sendOwnerMessage(seller, "auction.expired-notification");
             SoundFeedback.listingExpired(seller);
         }
 
@@ -986,20 +992,64 @@ public final class AuctionService {
     }
 
     private void notifySellerOfSale(AuctionListing listing, Player buyer) {
-        String message = messages.renderConfigured(
-                "auction.sold-notification",
-                "item", resolveItemName(listing.getItem()),
-                "buyer", buyer.getName(),
-                "price", formatEconomyPrice(listing.getPrice())
-        );
-
-        Player sellerOnline = Bukkit.getPlayer(listing.getSellerUuid());
-        if (sellerOnline != null && sellerOnline.isOnline()) {
-            sellerOnline.sendMessage(message);
+        String path = "auction.sold-notification";
+        String genericItem = messages.render("gui-values.generic-item", "");
+        String price = formatEconomyPrice(listing.getPrice());
+        if (me.foesio.foAuction.utils.OwnerMessages.isConfiguredList(path)) {
+            List<String> lines = me.foesio.foAuction.utils.OwnerMessages.optionalList(messages, path, Map.of(
+                    "item", genericItem, "buyer", buyer.getName(), "price", price));
+            if (lines.isEmpty()) return;
+            Player online = Bukkit.getPlayer(listing.getSellerUuid());
+            if (online != null && online.isOnline()) {
+                sendOwnerMessage(online, path, "item", genericItem,
+                        "buyer", buyer.getName(), "price", price);
+            } else {
+                for (String line : lines) {
+                    if (!line.isBlank()) queueNotificationInternal(listing.getSellerUuid(), line);
+                }
+            }
             return;
         }
-
+        if (!me.foesio.foAuction.utils.OwnerMessages.isConfiguredScalar(path)) return;
+        String scalar = messages.render(path, "");
+        if (scalar.isBlank()) return;
+        Player sellerOnline = Bukkit.getPlayer(listing.getSellerUuid());
+        if (sellerOnline != null && sellerOnline.isOnline()) {
+            try {
+                PaperSoldNotification.send(sellerOnline, listing.getItem(), buyer.getName(),
+                        price, messages);
+            } catch (ReflectiveOperationException | LinkageError unavailable) {
+                sendOwnerMessage(sellerOnline, path, "item", genericItem,
+                        "buyer", buyer.getName(), "price", price);
+            }
+            return;
+        }
+        String message = messages.render(path, "",
+                "item", genericItem, "buyer", buyer.getName(), "price", price);
         queueNotificationInternal(listing.getSellerUuid(), message);
+    }
+
+    private void sendOwnerMessage(Player player, String path, String... placeholders) {
+        me.foesio.foAuction.utils.OwnerMessages.send(messages, player, path, placeholders);
+    }
+
+    /** Isolated so a Spigot runtime can use the configured text fallback. */
+    private static final class PaperSoldNotification {
+        private static void send(Player seller, ItemStack item, String buyer, String price,
+                                 FoMessageService messages) throws ReflectiveOperationException {
+            String marker = "%%foauction_item%%";
+            ItemMeta meta = item.getItemMeta();
+            net.kyori.adventure.text.Component itemName = meta != null && meta.hasDisplayName()
+                    ? me.foesio.core.dialog.DialogIcons.render(seller, meta.getDisplayName())
+                    : net.kyori.adventure.text.Component.translatable(item.getTranslationKey());
+            net.kyori.adventure.text.Component rendered = messages.renderComponent(seller,
+                    "auction.sold-notification", "", Map.of("item", marker,
+                            "buyer", buyer, "price", price))
+                    .replaceText(net.kyori.adventure.text.TextReplacementConfig.builder()
+                            .matchLiteral(marker).replacement(itemName).build());
+            seller.getClass().getMethod("sendMessage", net.kyori.adventure.text.Component.class)
+                    .invoke(seller, rendered);
+        }
     }
 
     public String formatEconomyPrice(double value) {
@@ -1095,7 +1145,8 @@ public final class AuctionService {
         if (note == null || note.isBlank()) {
             return false;
         }
-        return note.toLowerCase(Locale.ROOT).contains("expired");
+        return note.equals("@foauction:listing-expired")
+                || note.toLowerCase(Locale.ROOT).contains("expired");
     }
 
     private String resolvePlayerName(UUID playerUuid) {
@@ -1130,8 +1181,8 @@ public final class AuctionService {
 
     private DeliveryType deliverItemToPlayerOrClaims(UUID playerUuid, Player onlinePlayer, ItemStack item) {
         String claimNote = onlinePlayer != null && onlinePlayer.isOnline()
-                ? "Inventory full fallback"
-                : "Player offline";
+                ? "@foauction:inventory-full"
+                : "@foauction:player-offline";
         return deliverItemToPlayerOrClaims(playerUuid, onlinePlayer, item, claimNote);
     }
 
@@ -1349,15 +1400,15 @@ public final class AuctionService {
         if (searchQuery == null) {
             return "";
         }
-        
+
         // Remove leading/trailing whitespace
         String trimmed = searchQuery.trim();
-        
+
         // Length validation - prevent excessively long queries
         if (trimmed.length() > 100) {
             trimmed = trimmed.substring(0, 100);
         }
-        
+
         // Remove potentially dangerous characters that could cause issues
         // Remove HTML/XML tags, script content, and special characters
         String sanitized = trimmed
@@ -1365,21 +1416,21 @@ public final class AuctionService {
             .replaceAll("[<>\"'&]", "") // Remove special HTML characters
             .replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "") // Remove control characters except newline, tab, return
             .replaceAll("[\\p{So}\\p{Sk}]", ""); // Remove symbols and modifiers
-        
+
         // Normalize whitespace
         sanitized = sanitized.replaceAll("\\s+", " ").trim();
-        
+
         // Additional security: check for potential injection patterns
         String lowerSanitized = sanitized.toLowerCase();
         if (lowerSanitized.contains("javascript:") ||
-            lowerSanitized.contains("data:") || 
+            lowerSanitized.contains("data:") ||
             lowerSanitized.contains("vbscript:") ||
             lowerSanitized.contains("file:") ||
             lowerSanitized.contains("ftp:")) {
             // Return empty string if potentially dangerous patterns found
             return "";
         }
-        
+
         return sanitized;
     }
 

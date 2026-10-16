@@ -27,9 +27,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public final class GuiConfigService {
     private static final String[] GUI_FILES = {
@@ -44,18 +47,20 @@ public final class GuiConfigService {
     private static final String[] LEGACY_GUI_FILES = {
             "admin-remove.yml"
     };
+    private static final Map<String, List<String>> GUI_SCHEMA_V3_PATHS = schemaV3Paths();
 
     private final JavaPlugin plugin;
     private final FoMessageService messages;
     private final FoMigrationStore migrations;
     private final Map<String, FileConfiguration> configs;
+    private final Set<String> warnedLayoutConflicts;
 
     public GuiConfigService(JavaPlugin plugin, FoMessageService messages) {
         this.plugin = plugin;
         this.messages = messages;
         this.migrations = FoMigrationStore.create(plugin);
         this.configs = new HashMap<>();
-        migrateGuiFiles();
+        this.warnedLayoutConflicts = new HashSet<>();
         reload();
     }
 
@@ -67,9 +72,9 @@ public final class GuiConfigService {
         }
 
         configs.clear();
+        warnedLayoutConflicts.clear();
         for (String fileName : GUI_FILES) {
             File file = new File(folder, fileName);
-            ResourceFiles.saveDefault(plugin, "guis/" + fileName);
             YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
             configs.put(fileName, config);
         }
@@ -94,9 +99,13 @@ public final class GuiConfigService {
     }
 
     public int slot(String fileName, String path, int fallback) {
+        return slot(fileName, path, fallback, 54);
+    }
+
+    public int slot(String fileName, String path, int fallback, int inventorySize) {
         FileConfiguration config = config(fileName);
         int slot = config.getInt(path, fallback);
-        if (slot < 0 || slot > 53) {
+        if (slot < 0 || slot >= inventorySize) {
             plugin.getLogger().warning(ColorPalette.log("Invalid GUI slot " + slot + " at guis/" + fileName + ":" + path + ". Using " + fallback + "."));
             FoAuction.fileLogger().warn("Invalid GUI slot " + slot + " at guis/" + fileName + ":" + path + ". Using " + fallback + ".");
             return fallback;
@@ -125,6 +134,28 @@ public final class GuiConfigService {
         return slots.length == 0 ? fallback : slots;
     }
 
+    public void warnLayoutConflict(String fileName, String path, int requested, int resolved) {
+        String key = fileName + ':' + path + ':' + requested + ':' + resolved;
+        if (!warnedLayoutConflicts.add(key)) {
+            return;
+        }
+        String warning = "GUI slot collision at guis/" + fileName + ':' + path
+                + " (" + requested + "). Using " + resolved + " so rendering and clicks stay aligned.";
+        plugin.getLogger().warning(ColorPalette.log(warning));
+        FoAuction.fileLogger().warn(warning);
+    }
+
+    public void warnContentSlotAdjustment(String fileName) {
+        String key = fileName + ":content-slots";
+        if (!warnedLayoutConflicts.add(key)) {
+            return;
+        }
+        String warning = "Ignored duplicate, out-of-range, or control-overlapping content slots in guis/"
+                + fileName + " so rendered entries and click actions stay aligned.";
+        plugin.getLogger().warning(ColorPalette.log(warning));
+        FoAuction.fileLogger().warn(warning);
+    }
+
     public ItemStack item(
             Player viewer,
             String fileName,
@@ -135,14 +166,45 @@ public final class GuiConfigService {
             boolean fallbackGlow,
             Object... placeholders
     ) {
+        return item(viewer, fileName, path, fallbackMaterial, fallbackName, fallbackLore,
+                null, fallbackGlow, placeholders);
+    }
+
+    /**
+     * Builds a configured item while using lore that has already expanded a
+     * list-valued placeholder such as {@code {options}}.
+     */
+    public ItemStack itemWithResolvedLore(
+            Player viewer,
+            String fileName,
+            String path,
+            Material fallbackMaterial,
+            String fallbackName,
+            List<String> resolvedLore,
+            boolean fallbackGlow,
+            Object... placeholders
+    ) {
+        return item(viewer, fileName, path, fallbackMaterial, fallbackName, resolvedLore,
+                resolvedLore, fallbackGlow, placeholders);
+    }
+
+    private ItemStack item(
+            Player viewer,
+            String fileName,
+            String path,
+            Material fallbackMaterial,
+            String fallbackName,
+            List<String> fallbackLore,
+            List<String> resolvedLore,
+            boolean fallbackGlow,
+            Object... placeholders
+    ) {
         FileConfiguration config = config(fileName);
         Material material = material(fileName, path + ".material", fallbackMaterial);
         ItemStack item = new ItemStack(material, Math.max(1, config.getInt(path + ".amount", 1)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            List<String> lore = config.isList(path + ".lore")
-                    ? config.getStringList(path + ".lore")
-                    : fallbackLore;
+            List<String> lore = resolveItemLore(config, path, fallbackLore, resolvedLore);
             Map<String, String> placeholderValues = placeholderValues(placeholders);
             String name = messages.renderTemplateForViewer(viewer,
                     config.getString(path + ".name", fallbackName), placeholderValues);
@@ -168,6 +230,20 @@ public final class GuiConfigService {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    static List<String> resolveItemLore(
+            FileConfiguration config,
+            String path,
+            List<String> fallbackLore,
+            List<String> resolvedLore
+    ) {
+        if (resolvedLore != null) {
+            return List.copyOf(resolvedLore);
+        }
+        return config.isList(path + ".lore")
+                ? config.getStringList(path + ".lore")
+                : fallbackLore;
     }
 
     /**
@@ -396,6 +472,127 @@ public final class GuiConfigService {
             }
             return true;
         });
+        if (migrations.version() < 2) {
+            return;
+        }
+        migrations.runToVersion(3, this::migrateSchemaV3);
+    }
+
+    private boolean migrateSchemaV3() {
+        Map<File, YamlConfiguration> changedConfigs = new LinkedHashMap<>();
+        Map<File, byte[]> originalFiles = new LinkedHashMap<>();
+        try {
+            for (Map.Entry<String, List<String>> entry : GUI_SCHEMA_V3_PATHS.entrySet()) {
+                String fileName = entry.getKey();
+                File file = new File(plugin.getDataFolder(), "guis" + File.separator + fileName);
+                ResourceFiles.saveDefault(plugin, "guis/" + fileName);
+                YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+                try (InputStream input = plugin.getResource("guis/" + fileName)) {
+                    if (input == null) {
+                        continue;
+                    }
+                    YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                            new InputStreamReader(input, StandardCharsets.UTF_8)
+                    );
+                    boolean changed = migrateLegacyDecorationPaths(config);
+                    changed |= addMissingPaths(config, defaults, entry.getValue());
+                    if (changed) {
+                        changedConfigs.put(file, config);
+                        originalFiles.put(file, Files.readAllBytes(file.toPath()));
+                    }
+                }
+            }
+
+            for (Map.Entry<File, YamlConfiguration> changed : changedConfigs.entrySet()) {
+                backupBeforeMigration(changed.getKey());
+                changed.getValue().save(changed.getKey());
+            }
+            for (File changed : changedConfigs.keySet()) {
+                FoAuction.fileLogger().info("Added FoAuction 3.4 GUI settings to guis/" + changed.getName() + ".");
+            }
+            return true;
+        } catch (IOException | RuntimeException exception) {
+            for (Map.Entry<File, byte[]> original : originalFiles.entrySet()) {
+                try {
+                    Files.write(original.getKey().toPath(), original.getValue());
+                } catch (IOException rollbackFailure) {
+                    plugin.getLogger().severe(ColorPalette.log("Could not roll back GUI config "
+                            + original.getKey().getName() + ": " + rollbackFailure.getMessage()));
+                }
+            }
+            plugin.getLogger().warning(ColorPalette.log("Could not apply FoAuction 3.4 GUI migration: " + exception.getMessage()));
+            FoAuction.fileLogger().warn("Could not apply FoAuction 3.4 GUI migration: " + exception.getMessage() + ".");
+            return false;
+        }
+    }
+
+    static boolean migrateLegacyDecorationPaths(YamlConfiguration config) {
+        boolean changed = false;
+        changed |= copyFirstPresent(config, "frame.material", "filler.material", "items.filler.material");
+        changed |= copyFirstPresent(config, "content-filler.material", "empty-slot-filler.material", "items.empty-slot.material");
+        return changed;
+    }
+
+    private static boolean copyFirstPresent(YamlConfiguration config, String target, String... sources) {
+        if (config.isSet(target)) {
+            return false;
+        }
+        for (String source : sources) {
+            if (!config.isSet(source)) {
+                continue;
+            }
+            config.set(target, config.get(source));
+            return true;
+        }
+        return false;
+    }
+
+    static boolean addMissingPaths(YamlConfiguration config, YamlConfiguration defaults, List<String> paths) {
+        boolean changed = false;
+        for (String path : paths) {
+            if (config.isSet(path) || !defaults.isSet(path)) {
+                continue;
+            }
+            config.set(path, defaults.get(path));
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static Map<String, List<String>> schemaV3Paths() {
+        Map<String, List<String>> paths = new LinkedHashMap<>();
+        paths.put("main.yml", List.of(
+                "frame.material", "frame.name", "frame.lore",
+                "content-filler.material", "content-filler.name", "content-filler.lore",
+                "items.previous.material", "items.sort.lore", "items.sort.option-selected", "items.sort.option-unselected",
+                "items.filter.lore", "items.filter.option-selected", "items.filter.option-unselected",
+                "items.search.material", "items.history.material", "items.clear-search.material", "items.next.material"
+        ));
+        paths.put("listings.yml", List.of(
+                "title-format", "frame.material", "frame.name", "frame.lore",
+                "content-filler.material", "content-filler.name", "content-filler.lore",
+                "items.previous.material", "items.back.material", "items.sort.lore",
+                "items.sort.option-selected", "items.sort.option-unselected", "items.next.material"
+        ));
+        paths.put("seller-view.yml", List.of(
+                "title-format", "frame.material", "frame.name", "frame.lore",
+                "items.previous.material", "items.back.material", "items.sort.lore",
+                "items.sort.option-selected", "items.sort.option-unselected", "items.next.material"
+        ));
+        paths.put("claims.yml", List.of(
+                "title-format", "frame.material", "frame.name", "frame.lore",
+                "content-filler.material", "content-filler.name", "content-filler.lore",
+                "items.previous.material", "items.back.material", "items.next.material", "claim-entry.money.material"
+        ));
+        paths.put("history.yml", List.of(
+                "title-format", "frame.material", "frame.name", "frame.lore",
+                "content-filler.material", "content-filler.name", "content-filler.lore",
+                "items.previous.material", "items.back.material", "items.next.material"
+        ));
+        paths.put("preview.yml", List.of(
+                "title-format", "border.material", "border.name", "border.lore", "items.back.material"
+        ));
+        return Map.copyOf(paths);
     }
 
     private boolean migrateDefaultButtonStyles(String fileName, YamlConfiguration config, YamlConfiguration defaults) {
@@ -573,7 +770,7 @@ public final class GuiConfigService {
             if (hasItemOverride(config, targetPath)) {
                 continue;
             }
-            for (String field : List.of("material", "amount", "name", "lore", "hide-enchants", "glow")) {
+            for (String field : List.of("material", "amount", "name", "lore", "hide-enchants", "glow", "custom-model-data")) {
                 String source = "items.history-or-clear." + field;
                 if (!config.isSet(source)) {
                     continue;
@@ -585,13 +782,14 @@ public final class GuiConfigService {
         return changed;
     }
 
-    private boolean hasItemOverride(FileConfiguration config, String path) {
+    static boolean hasItemOverride(FileConfiguration config, String path) {
         return config.isSet(path + ".material")
                 || config.isSet(path + ".amount")
                 || config.isSet(path + ".name")
                 || config.isSet(path + ".lore")
                 || config.isSet(path + ".hide-enchants")
-                || config.isSet(path + ".glow");
+                || config.isSet(path + ".glow")
+                || config.isSet(path + ".custom-model-data");
     }
 
     private void backupBeforeMigration(File file) throws IOException {

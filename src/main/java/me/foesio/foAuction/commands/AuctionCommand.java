@@ -6,6 +6,7 @@ import me.foesio.foAuction.service.AuctionService;
 import me.foesio.core.economy.VaultEconomyBridge;
 import me.foesio.foAuction.utils.FormatUtils;
 import me.foesio.foAuction.utils.InputValidationUtils;
+import me.foesio.foAuction.utils.OwnerMessages;
 import me.foesio.foAuction.utils.SoundFeedback;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.sound.FoAdminSounds;
@@ -48,16 +49,20 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         this.adminSounds = adminSounds;
     }
 
+    private void sendOwnerMessage(CommandSender sender, String path, String... placeholders) {
+        OwnerMessages.send(messages, sender, path, placeholders);
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("foauction.use")) {
-            messages.sendConfigured(sender, "command.no-permission", "label", label);
+            sendOwnerMessage(sender, "command.no-permission", "label", label);
             adminSounds.updateError(sender);
             return true;
         }
         if (args.length == 0) {
             if (!(sender instanceof Player player)) {
-                messages.sendConfigured(sender, "command.only-players-open-gui");
+                sendOwnerMessage(sender, "command.only-players-open-gui");
                 return true;
             }
 
@@ -70,12 +75,12 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "sell" -> {
                 if (!(sender instanceof Player player)) {
-                    messages.sendConfigured(sender, "command.only-players-sell");
+                    sendOwnerMessage(sender, "command.only-players-sell");
                     return true;
                 }
 
                 if (args.length < 2) {
-                    messages.sendConfigured(sender, "command.usage-sell", "label", label);
+                    sendOwnerMessage(sender, "command.usage-sell", "label", label);
                     adminSounds.updateError(sender);
                     return true;
                 }
@@ -84,7 +89,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                 try {
                     price = InputValidationUtils.validatePrice(args[1]);
                 } catch (InputValidationUtils.InvalidInputException exception) {
-                    messages.sendConfigured(sender, "command.invalid-price", "error", exception.getMessage());
+                    sendOwnerMessage(sender, "command.invalid-price", "error", validationError(exception));
                     adminSounds.updateError(player);
                     return true;
                 }
@@ -93,14 +98,14 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                 if (settings.isConfirmationGuiEnabled()) {
                       ItemStack item = player.getInventory().getItemInMainHand();
                       if (item == null || item.getType().isAir()) {
-                          messages.sendConfigured(sender, "command.hold-item");
+                          sendOwnerMessage(sender, "command.hold-item");
                           adminSounds.updateError(player);
                           return true;
                       }
 
                     // Validate price range before showing GUI
                       if (price < settings.getMinPrice() || price > settings.getMaxPrice()) {
-                          messages.sendConfigured(
+                          sendOwnerMessage(
                                   sender,
                                   "command.price-range",
                                   "min", formatDisplayPrice(settings.getMinPrice()),
@@ -119,7 +124,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                 AuctionService.SellResult result = auctionService.createListing(player, price);
                 switch (result.type()) {
                       case SUCCESS -> {
-                          messages.sendConfigured(
+                          sendOwnerMessage(
                                   sender,
                                   "command.listed",
                                   "price", formatEconomyPrice(result.listing().getPrice()),
@@ -129,11 +134,11 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                           SoundFeedback.listingCreated(player);
                       }
                       case NO_ITEM -> {
-                          messages.sendConfigured(sender, "command.hold-item");
+                          sendOwnerMessage(sender, "command.hold-item");
                           adminSounds.updateError(player);
                       }
                       case PRICE_OUT_OF_RANGE -> {
-                          messages.sendConfigured(
+                          sendOwnerMessage(
                                   sender,
                                   "command.price-range",
                                   "min", formatDisplayPrice(result.minPrice()),
@@ -142,19 +147,19 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                           adminSounds.updateError(player);
                       }
                       case INSUFFICIENT_FUNDS -> {
-                          messages.sendConfigured(sender, "command.need-fee", "amount", formatEconomyPrice(result.missingFee()));
+                          sendOwnerMessage(sender, "command.need-fee", "amount", formatEconomyPrice(result.missingFee()));
                           adminSounds.updateError(player);
                       }
                       case NO_SLOTS -> {
-                          messages.sendConfigured(sender, "command.no-slots", "max", String.valueOf(result.maxSlots()));
+                          sendOwnerMessage(sender, "command.no-slots", "max", String.valueOf(result.maxSlots()));
                           adminSounds.updateError(player);
                       }
                       case BLACKLISTED -> {
-                          messages.sendConfigured(sender, "command.blacklisted");
+                          sendOwnerMessage(sender, "command.blacklisted");
                           adminSounds.updateError(player);
                       }
                       case ECONOMY_ERROR -> {
-                          messages.sendConfigured(sender, "command.economy-error");
+                          sendOwnerMessage(sender, "command.economy-error");
                           adminSounds.updateError(player);
                       }
                 }
@@ -162,7 +167,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             }
             case "claims" -> {
                 if (!(sender instanceof Player player)) {
-                    messages.sendConfigured(sender, "command.only-players-claims");
+                    sendOwnerMessage(sender, "command.only-players-claims");
                     return true;
                 }
 
@@ -172,28 +177,28 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             }
             case "search" -> {
                 if (!(sender instanceof Player player)) {
-                    messages.sendConfigured(sender, "command.only-players-search");
+                    sendOwnerMessage(sender, "command.only-players-search");
                     return true;
                 }
 
                 if (args.length < 2) {
-                    messages.sendConfigured(sender, "command.usage-search", "label", label);
+                    sendOwnerMessage(sender, "command.usage-search", "label", label);
                     return true;
                 }
 
                 String query = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
                 if (query.isBlank() || "clear".equalsIgnoreCase(query)) {
                     auctionService.clearSearchQuery(player.getUniqueId());
-                    messages.sendConfigured(sender, "command.search-cleared");
+                    sendOwnerMessage(sender, "command.search-cleared");
                     SoundFeedback.clearSearch(player);
                 } else {
                     try {
                         String validatedQuery = InputValidationUtils.validateSearchQuery(query);
                         auctionService.setSearchQuery(player.getUniqueId(), validatedQuery);
-                        messages.sendConfigured(sender, "command.searching", "query", validatedQuery);
+                        sendOwnerMessage(sender, "command.searching", "query", validatedQuery);
                         SoundFeedback.search(player);
                     } catch (InputValidationUtils.InvalidInputException exception) {
-                        messages.sendConfigured(sender, "command.invalid-search-query", "error", exception.getMessage());
+                        sendOwnerMessage(sender, "command.invalid-search-query", "error", validationError(exception));
                         adminSounds.updateError(player);
                         return true;
                     }
@@ -205,7 +210,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             }
             case "view" -> {
                 if (!(sender instanceof Player player)) {
-                    messages.sendConfigured(sender, "command.only-players-view");
+                    sendOwnerMessage(sender, "command.only-players-view");
                     return true;
                 }
 
@@ -215,25 +220,25 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                         String validatedPlayerName = InputValidationUtils.validatePlayerName(args[1]);
                           target = findOfflinePlayerByName(validatedPlayerName);
                       if (target == null) {
-                          messages.sendConfigured(sender, "command.player-not-found", "player", validatedPlayerName);
+                          sendOwnerMessage(sender, "command.player-not-found", "player", validatedPlayerName);
                           adminSounds.updateError(player);
                           return true;
                       }
                   } catch (InputValidationUtils.InvalidInputException exception) {
-                      messages.sendConfigured(sender, "command.invalid-player-name", "error", exception.getMessage());
+                      sendOwnerMessage(sender, "command.invalid-player-name", "error", validationError(exception));
                       adminSounds.updateError(player);
                       return true;
                       }
                   }
 
                   String targetName = target.getName() != null ? target.getName() : target.getUniqueId().toString().substring(0, 8);
-                  messages.sendConfigured(sender, "command.opening-listings", "player", targetName);
+                  sendOwnerMessage(sender, "command.opening-listings", "player", targetName);
                   guiManager.openSellerViewGui(player, target.getUniqueId(), 0);
                 SoundFeedback.menuOpen(player);
                 return true;
             }
               default -> {
-                  messages.sendConfigured(sender, "command.usage", "label", label);
+                  sendOwnerMessage(sender, "command.usage", "label", label);
                   adminSounds.updateError(sender);
                   return true;
               }
@@ -281,6 +286,11 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
 
     private String formatDisplayPrice(double value) {
         return FormatUtils.formatPrice(value, settings.isCompactPriceFormatEnabled());
+    }
+
+    private String validationError(InputValidationUtils.InvalidInputException exception) {
+        return messages.render("validation-errors." + exception.reasonKey(), "",
+                "max", Integer.toString(InputValidationUtils.MAX_SEARCH_QUERY_LENGTH));
     }
 
     private String formatEconomyPrice(double value) {

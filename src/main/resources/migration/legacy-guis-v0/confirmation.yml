@@ -1,0 +1,21 @@
+# Buy/sell confirmation GUI.
+# Placeholders in confirm/cancel lore: {price}, {fee}
+sell-title: "Confirmation"
+buy-title: "Confirmation"
+items:
+  preview:
+    slot: 13
+  cancel:
+    slot: 11
+    material: RED_STAINED_GLASS_PANE
+    name: "{bad}ᴄᴀɴᴄᴇʟ"
+    lore:
+      - "{white}Price: {theme}{price}"
+      - "{white}Fee: {theme}{fee}"
+  confirm:
+    slot: 15
+    material: LIME_STAINED_GLASS_PANE
+    name: "{good}ᴄᴏɴꜰɪʀᴍ"
+    lore:
+      - "{white}Price: {theme}{price}"
+      - "{white}Fee: {theme}{fee}"

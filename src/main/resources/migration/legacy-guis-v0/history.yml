@@ -1,0 +1,22 @@
+# Sold history GUI. Slots are 0-based Minecraft inventory slots.
+title: "History"
+content-slots: [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
+items:
+  previous:
+    slot: 27
+    material: ARROW
+  back:
+    slot: 31
+    material: ARROW
+    name: "{theme}ʙᴀᴄᴋ"
+    lore:
+      - "{white}Return to auction house"
+  next:
+    slot: 35
+    material: ARROW
+  empty:
+    slot: 13
+    material: PAPER
+    name: "{muted}ɴᴏ ʜɪꜱᴛᴏʀʏ ʏᴇᴛ"
+    lore:
+      - "{white}No sold listings were found"

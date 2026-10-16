@@ -3,12 +3,12 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>me.foesio</groupId>
     <artifactId>FoAuction</artifactId>
-    <version>3.3</version>
+    <version>3.4</version>
     <packaging>jar</packaging>
     <name>FoAuction</name>
     <properties>
         <java.version>21</java.version>
-        <fo-plugin-core.version>1.4</fo-plugin-core.version>
+        <fo-plugin-core.version>1.10</fo-plugin-core.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <build>
@@ -43,6 +43,11 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
             </plugin>
         </plugins>
         <resources>
@@ -97,6 +102,12 @@
             <groupId>me.foesio</groupId>
             <artifactId>fo-plugin-core</artifactId>
             <version>${fo-plugin-core.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

@@ -1,0 +1,11 @@
+# Container preview GUI. Content slots mirror container contents.
+title: "Previewing"
+items:
+  preview:
+    slot: 4
+  back:
+    slot: 40
+    material: ARROW
+    name: "{theme}ʙᴀᴄᴋ"
+    lore:
+      - "{white}Return to auction house"

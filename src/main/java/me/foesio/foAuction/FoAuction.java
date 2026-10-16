@@ -8,9 +8,6 @@ import me.foesio.core.command.FoAdminCommandContext;
 import me.foesio.core.command.FoAdminMessages;
 import me.foesio.core.command.FoAdminSubcommand;
 import me.foesio.core.command.FoAdminArguments;
-import me.foesio.core.dialog.ConfiguredTextDialogs;
-import me.foesio.core.dialog.DialogButton;
-import me.foesio.core.dialog.TextDialogRequest;
 import me.foesio.core.logging.FoFileLogger;
 import me.foesio.core.message.FoMessageMigrations;
 import me.foesio.core.message.FoMessageService;
@@ -23,13 +20,15 @@ import me.foesio.core.sound.FoAdminSounds;
 import me.foesio.core.sound.FoEditorSounds;
 import me.foesio.core.sound.FoGuiSounds;
 import me.foesio.core.sound.FoSoundService;
-import me.foesio.core.sound.FoSoundMigrations;
 import me.foesio.core.update.UpdateNoticeService;
 
 import me.foesio.foAuction.commands.AuctionCommand;
 import me.foesio.foAuction.config.AuctionSettings;
 import me.foesio.foAuction.gui.AuctionGuiManager;
+import me.foesio.foAuction.gui.AuctionSearchDialog;
 import me.foesio.foAuction.gui.GuiConfigService;
+import me.foesio.foAuction.gui.PublicAuctionGuiMigration;
+import me.foesio.foAuction.gui.PublicAuctionGuis;
 import me.foesio.foAuction.gui.editor.AdminEditorManager;
 import me.foesio.foAuction.listeners.AdminEditorListener;
 import me.foesio.foAuction.listeners.GuiListener;
@@ -63,7 +62,7 @@ public final class FoAuction extends JavaPlugin {
     private FoMetrics metrics;
     private FoMessageService messageService;
     private GuiConfigService guiConfigService;
-    private ConfiguredTextDialogs dialogTexts;
+    private AuctionSearchDialog dialogTexts;
     private VaultEconomyBridge economyService;
     private DatabaseManager databaseManager;
     private IUserDataRepository userDataRepository;
@@ -77,6 +76,8 @@ public final class FoAuction extends JavaPlugin {
     private UpdateNoticeService updateNotices;
     private PlayerNameCache playerNameCache;
     private AuctionGuiManager guiManager;
+    private PublicAuctionGuis publicGuis;
+    private GuiListener guiListener;
     private AdminEditorManager adminEditorManager;
     private ExpirationTask expirationTask;
     private volatile boolean periodicSaveCancelled;
@@ -88,13 +89,19 @@ public final class FoAuction extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        String[] priorDataEntries = getDataFolder().list();
+        boolean ownerDataExisted = priorDataEntries == null
+                ? getDataFolder().exists() : priorDataEntries.length > 0;
         fileLogger = FoFileLogger.create(this);
         activeFileLogger = fileLogger;
         settings = new AuctionSettings(this);
         fileLogger.configure(settings.isFileLoggingEnabled(), true);
-        messageService = FoMessageService.load(this, messageMigrations());
+        boolean publicGuiMigrationReady = PublicAuctionGuiMigration.install(this, ownerDataExisted);
+        messageService = FoMessageService.loadPreservingRemovals(this, messageMigrations());
+        me.foesio.foAuction.utils.OwnerMessages.configure(
+                getDataFolder().toPath().resolve("messages.yml"));
+        me.foesio.foAuction.utils.FormatUtils.configure(messageService);
         refreshCoreContext();
-        migrateSprites();
         guiConfigService = new GuiConfigService(this, messageService);
         dialogTexts = createDialogTexts();
         dialogTexts.load();
@@ -131,7 +138,16 @@ public final class FoAuction extends JavaPlugin {
           );
           auctionService.rebuildIndex();
 
-        guiManager = new AuctionGuiManager(auctionService, settings, messageService, playerNameCache, guiConfigService);
+        guiManager = new AuctionGuiManager(auctionService, settings, playerNameCache, guiConfigService);
+        guiListener = new GuiListener(this, guiManager, auctionService, () -> core, dialogTexts, messageService);
+        publicGuis = new PublicAuctionGuis(this, auctionService, settings, playerNameCache, messageService);
+        publicGuis.migrationReady(publicGuiMigrationReady);
+        publicGuis.bind(guiListener::handlePublicClick);
+        guiManager.usePublicGuis(publicGuis);
+        me.foesio.core.gui.publicgui.GuiLoadReport publicGuiLoad = publicGuis.start();
+        if (!publicGuiMigrationReady || !publicGuiLoad.successful()) {
+            getLogger().severe("Public auction inventories are unavailable until the GUI files are repaired.");
+        }
         adminEditorManager = new AdminEditorManager(
                 this,
                 settings,
@@ -164,6 +180,10 @@ public final class FoAuction extends JavaPlugin {
             expirationTask.cancel();
             fileLogger.info("Expiration task stopped.");
         }
+        if (publicGuis != null) {
+            publicGuis.close();
+            publicGuis = null;
+        }
         periodicSaveCancelled = true;
         if (periodicSaveScheduled) {
             periodicSaveScheduled = false;
@@ -188,7 +208,7 @@ public final class FoAuction extends JavaPlugin {
             userDataRepository.shutdownAndFlush();
             fileLogger.info("Userdata flushed.");
         }
-        
+
         if (databaseManager != null) {
             databaseManager.closeConnection();
         }
@@ -230,10 +250,7 @@ public final class FoAuction extends JavaPlugin {
                 this
         );
 
-        getServer().getPluginManager().registerEvents(
-                  new GuiListener(this, guiManager, auctionService, () -> core, dialogTexts, messageService),
-                this
-        );
+        getServer().getPluginManager().registerEvents(guiListener, this);
 
         getServer().getPluginManager().registerEvents(
                 new AdminEditorListener(adminEditorManager, () -> core),
@@ -318,9 +335,23 @@ public final class FoAuction extends JavaPlugin {
                           throw new IllegalStateException("Vault economy provider not found");
                       }
                   })
-          .add("sounds", sounds::reload)
-                  .addMessages(messageService)
-                  .add("guis", guiConfigService::reload)
+          .add("sounds", () -> {
+              if (!sounds.reloadChecked()) throw new IllegalStateException("Invalid sounds.yml; previous sound cache remains active");
+          })
+          .add("messages", () -> {
+              publicGuis.validateInstalledMessages();
+              messageService.reload();
+              me.foesio.foAuction.utils.OwnerMessages.reload(
+                      getDataFolder().toPath().resolve("messages.yml"));
+          })
+                  .add("guis", () -> {
+                      me.foesio.core.gui.publicgui.GuiLoadReport report = publicGuis.reload();
+                      if (!report.successful()) {
+                          throw new IllegalStateException("Public GUI reload failed with "
+                                  + report.diagnostics().size() + " error(s); previous GUI cache remains active");
+                      }
+                      guiConfigService.reload();
+                  })
                   .add("dialogs", dialogTexts::reload)
                   .add("file-logging", () -> fileLogger.configure(settings.isFileLoggingEnabled(), false))
                   .reload();
@@ -344,7 +375,7 @@ public final class FoAuction extends JavaPlugin {
         }
         core = FoPluginCore.create(this);
         if (sounds == null) {
-            sounds = core.createSounds(soundMigrations());
+            sounds = FoSoundService.loadPreservingRemovals(this);
             adminSounds = FoAdminSounds.create(sounds);
             editorSounds = FoEditorSounds.create(sounds);
             guiSounds = FoGuiSounds.create(sounds);
@@ -366,24 +397,6 @@ public final class FoAuction extends JavaPlugin {
           if (fileLogger != null) {
               fileLogger.configure(settings.isFileLoggingEnabled(), false);
           }
-      }
-
-      private FoSoundMigrations soundMigrations() {
-          return FoSoundMigrations.create()
-                  .move("auction.menu-open", "gui.open")
-                  .copy("auction.page-turn", "gui.page-next")
-                  .copy("auction.page-turn", "gui.page-previous")
-                  .remove("auction.page-turn")
-                  .copy("auction.toggle", "gui.sort")
-                  .copy("auction.toggle", "gui.filter")
-                  .remove("auction.toggle")
-                  .move("auction.refresh", "gui.click")
-                  .move("auction.preview-open", "gui.open")
-                  .move("auction.search-updated", "gui.search")
-                  .move("auction.search-cleared", "gui.clear-search")
-                  .move("auction.selling-confirm", "gui.confirm")
-                  .move("auction.denied", "gui.error")
-                  .build();
       }
 
       private FoAdminCommand createAdminCommand() {
@@ -528,23 +541,6 @@ public final class FoAuction extends JavaPlugin {
                 .build();
       }
 
-      private void migrateSprites() {
-          messageService.migrateToVersion(core.migrations(), 1, config -> {
-              boolean changed = false;
-              changed |= FoMessageService.addMissingToken(config, "tokens.prefix", ":diamond:", null);
-              changed |= FoMessageService.addMissingToken(config, "command.listed", ":emerald:");
-              changed |= FoMessageService.addMissingToken(config, "command.invalid-price", ":redstone:");
-              changed |= FoMessageService.addMissingToken(config, "admin.reload", ":emerald:");
-              changed |= FoMessageService.addMissingToken(config, "admin.reload-failed", ":redstone:");
-              changed |= FoMessageService.addMissingToken(config, "editor.opened", ":book:");
-              changed |= FoMessageService.addMissingToken(config, "editor.saved", ":emerald:");
-              changed |= FoMessageService.addMissingToken(config, "editor.save-failed", ":redstone:");
-              changed |= FoMessageService.addMissingToken(config, "gui.purchase-inventory", ":emerald:");
-              changed |= FoMessageService.addMissingToken(config, "gui.insufficient-funds", ":redstone:");
-              return true;
-          });
-      }
-
       private boolean backfillEditorMessageDefaults(FileConfiguration config) {
           boolean changed = false;
           changed |= ensureMessage(config, "editor.opened", "{prefix}Opening admin editor.");
@@ -572,23 +568,7 @@ public final class FoAuction extends JavaPlugin {
           return true;
       }
 
-      private ConfiguredTextDialogs createDialogTexts() {
-          TextDialogRequest searchFallback = new TextDialogRequest(
-                  "Search",
-                  java.util.List.of("Enter item text to search listings.", "Leave empty to clear the current search."),
-                  "Search text",
-                  "",
-                  "Item name",
-                  DialogButton.search("Search", "Apply this search."),
-                  DialogButton.cancel("Cancel", "Return without changing search."),
-                  320,
-                  300,
-                  100,
-                  true,
-                  true,
-                  false
-          );
-          return ConfiguredTextDialogs.create(this)
-                  .register("search", searchFallback);
+      private AuctionSearchDialog createDialogTexts() {
+          return new AuctionSearchDialog(this);
       }
 }

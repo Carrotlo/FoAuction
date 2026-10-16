@@ -1,0 +1,34 @@
+title: "ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ"
+rows: 3
+filler:
+  enabled: false
+buttons:
+  confirm:
+    slot: 15
+    enabled: true
+    material: "LIME_STAINED_GLASS_PANE"
+    name: ":lime_stained_glass_pane: {good}&lCONFIRM"
+    lore:
+      - "&8ʙᴜᴛᴛᴏɴ"
+      - " "
+      - "&eⓘ Information ↓"
+      - "&7&l | &fPrice: {theme}{price}"
+      - "&7&l | &fFee: {theme}{fee}"
+      - " "
+      - "{good}→ Click to Confirm Listing ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "confirmation.confirm"
+entries:
+  preview:
+    slots:
+      - 13
+    source-item:
+      lore:
+        mode: "append"
+        lines:
+          - ""
+          - "{white}Selling for: {theme}{price}"
+          - "{white}Listing fee: {theme}{fee}"

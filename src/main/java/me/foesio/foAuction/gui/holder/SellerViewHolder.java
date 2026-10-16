@@ -12,13 +12,15 @@ public final class SellerViewHolder implements InventoryHolder {
     private final UUID viewerUuid;
     private final UUID sellerUuid;
     private final int page;
+    private final int maxPage;
     private final Inventory inventory;
     private final Map<Integer, UUID> listingBySlot;
 
-    public SellerViewHolder(UUID viewerUuid, UUID sellerUuid, int page, String title) {
+    public SellerViewHolder(UUID viewerUuid, UUID sellerUuid, int page, int maxPage, String title) {
         this.viewerUuid = viewerUuid;
         this.sellerUuid = sellerUuid;
         this.page = page;
+        this.maxPage = maxPage;
         this.inventory = Bukkit.createInventory(this, 54, title);
         this.listingBySlot = new HashMap<>();
     }
@@ -33,6 +35,10 @@ public final class SellerViewHolder implements InventoryHolder {
 
     public int getPage() {
         return page;
+    }
+
+    public int getMaxPage() {
+        return maxPage;
     }
 
     public void mapSlot(int slot, UUID listingId) {

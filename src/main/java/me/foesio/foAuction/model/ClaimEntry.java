@@ -215,14 +215,14 @@ public final class ClaimEntry {
             data.put("type", type.name());
             data.put("createdAt", createdAt);
             data.put("note", note);
-            
+
             if (type == Type.ITEM && item != null) {
                 data.put("item", FoItemStacks.encode(item));
             }
             if (type == Type.MONEY) {
                 data.put("money", money);
             }
-            
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             try (BukkitObjectOutputStream boos = new BukkitObjectOutputStream(baos)) {
                 boos.writeObject(data);

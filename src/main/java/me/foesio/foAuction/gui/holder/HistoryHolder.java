@@ -10,13 +10,15 @@ public final class HistoryHolder implements InventoryHolder {
     private final UUID viewerUuid;
     private final UUID sellerUuid;
     private final int page;
+    private final int maxPage;
     private final int returnPage;
     private final Inventory inventory;
 
-    public HistoryHolder(UUID viewerUuid, UUID sellerUuid, int page, int returnPage, String title) {
+    public HistoryHolder(UUID viewerUuid, UUID sellerUuid, int page, int maxPage, int returnPage, String title) {
         this.viewerUuid = viewerUuid;
         this.sellerUuid = sellerUuid;
         this.page = page;
+        this.maxPage = maxPage;
         this.returnPage = returnPage;
         this.inventory = Bukkit.createInventory(this, 54, title);
     }
@@ -31,6 +33,10 @@ public final class HistoryHolder implements InventoryHolder {
 
     public int getPage() {
         return page;
+    }
+
+    public int getMaxPage() {
+        return maxPage;
     }
 
     public int getReturnPage() {

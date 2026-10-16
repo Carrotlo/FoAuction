@@ -1,10 +1,12 @@
-# Container preview GUI. Content slots mirror container contents.
-title: "ᴘʀᴇᴠɪᴇᴡɪɴɢ"
-items:
-  preview:
-    slot: 4
+title: "ᴘʀᴇᴠɪᴇᴡɪɴɢ '{container}'"
+rows: 5
+filler:
+  enabled: false
+buttons:
   back:
     slot: 40
+    enabled: true
+    material: "IRON_DOOR"
     name: ":iron_door: {theme}&lBACK"
     lore:
       - "&8ʙᴜᴛᴛᴏɴ"
@@ -13,3 +15,68 @@ items:
       - "&7&l | &fReturn to the previous menu."
       - " "
       - "{good}→ Click to Go Back ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+    action: "preview.back"
+decorations:
+  border:
+    slots:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 5
+      - 6
+      - 7
+      - 8
+      - 36
+      - 37
+      - 38
+      - 39
+      - 41
+      - 42
+      - 43
+      - 44
+    material: "LIME_STAINED_GLASS_PANE"
+    name: " "
+    lore: []
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+      - "HIDE_ENCHANTS"
+entries:
+  preview-item:
+    slots:
+      - 4
+    source-item: {}
+  contents:
+    slots:
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+    source-item: {}
