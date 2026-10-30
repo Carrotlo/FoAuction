@@ -1,0 +1,21 @@
+# Auction slot purchase dialog. Valid placeholders: {base}, {bought}, {total},
+# {price}, {balance}, {currency}, {status}. Unsupported clients use the inventory menu.
+menu:
+  title: "{theme}Auction Slots"
+  body:
+    - "{muted}Base slots: {white}{base}"
+    - "{muted}Bought slots: {white}{bought}/3"
+    - "{muted}Total slots: {white}{total}"
+    - "{muted}{status}"
+    - "{muted}Balance: {white}{balance} {currency}"
+  buy-label: "Buy +1 slot"
+  buy-tooltip: "Review this permanent upgrade."
+  done-label: "Close"
+  back-label: "Back to listings"
+confirm:
+  title: "{theme}Confirm Slot Purchase"
+  body:
+    - "{muted}Buy one permanent auction slot for {theme}{price} {currency}{muted}?"
+  buy-label: "Confirm purchase"
+  buy-tooltip: "Spend {price} {currency}."
+  cancel-label: "Cancel"

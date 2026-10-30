@@ -18,6 +18,7 @@ import me.foesio.foAuction.model.FilterMode;
 import me.foesio.foAuction.model.SoldAuctionHistoryEntry;
 import me.foesio.foAuction.model.SortMode;
 import me.foesio.foAuction.service.AuctionService;
+import me.foesio.foAuction.service.SlotPurchaseService;
 import me.foesio.foAuction.service.PlayerNameCache;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -65,6 +66,7 @@ public final class PublicAuctionGuis implements AutoCloseable {
     private final JavaPlugin plugin;
     private final AuctionService auctions;
     private final AuctionSettings settings;
+    private final SlotPurchaseService slotPurchases;
     private final PlayerNameCache names;
     private final FoMessageService messages;
     private PublicGuiService service;
@@ -80,12 +82,14 @@ public final class PublicAuctionGuis implements AutoCloseable {
     }
 
     public PublicAuctionGuis(JavaPlugin plugin, AuctionService auctions, AuctionSettings settings,
-                             PlayerNameCache names, FoMessageService messages) {
+                             PlayerNameCache names, FoMessageService messages,
+                             SlotPurchaseService slotPurchases) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.auctions = Objects.requireNonNull(auctions, "auctions");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.names = Objects.requireNonNull(names, "names");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.slotPurchases = Objects.requireNonNull(slotPurchases, "slotPurchases");
     }
 
     private PublicGuiService newService(Map<String, Set<String>> menuActions) {
@@ -334,8 +338,12 @@ public final class PublicAuctionGuis implements AutoCloseable {
         Map<String, Map<Integer, PublicGuiRenderInput.EntryValue>> entries = new HashMap<>();
         entries.put("listings", listingEntries(player, view.listings(), slots, true));
         pageButtons(entries, "listings", view.page(), maxPage);
+        PublicGuiDefinition.Button slotButton = definition("listings").buttons().get("buy-slots");
+        Map<String, String> buttonStates = !slotPurchases.available() && slotButton != null
+                && slotButton.enabled() && slotButton.states().containsKey("gem-disabled")
+                ? Map.of("buy-slots", "gem-disabled") : Map.of();
         open(player, "listings", new Session("listings", view.page(), maxPage, null, 0, null, 0, 0),
-                new PublicGuiRenderInput(pagePlaceholders(view.page(), maxPage), Map.of(),
+                new PublicGuiRenderInput(pagePlaceholders(view.page(), maxPage), buttonStates,
                         enabledButton("listings", "sort")
                                 ? Map.of("sort", cycle("listings.sort", SortMode.values().length,
                                         view.sortMode().ordinal())) : Map.of(), entries));
@@ -842,7 +850,7 @@ public final class PublicAuctionGuis implements AutoCloseable {
                     "main.manage", "main.search", "main.history-or-clear", "main.previous", "main.next",
                     "listing.select", "listing.preview", "listing.admin");
             case "listings" -> Set.of("listings.back", "listings.sort", "listings.refresh",
-                    "listings.previous", "listings.next", "listing.cancel");
+                    "listings.previous", "listings.next", "listings.buy-slots", "listing.cancel");
             case "seller-view" -> Set.of("seller-view.back", "seller-view.sort", "seller-view.refresh",
                     "seller-view.previous", "seller-view.next", "listing.select", "listing.preview", "listing.admin");
             case "claims" -> Set.of("claims.back", "claims.refresh", "claims.previous", "claims.next",

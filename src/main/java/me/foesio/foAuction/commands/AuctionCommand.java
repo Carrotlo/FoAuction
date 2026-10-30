@@ -2,11 +2,14 @@ package me.foesio.foAuction.commands;
 
 import me.foesio.foAuction.config.AuctionSettings;
 import me.foesio.foAuction.gui.AuctionGuiManager;
+import me.foesio.foAuction.gui.SlotUpgradeMenu;
 import me.foesio.foAuction.service.AuctionService;
+import me.foesio.foAuction.service.SlotPurchaseService;
 import me.foesio.core.economy.VaultEconomyBridge;
 import me.foesio.foAuction.utils.FormatUtils;
 import me.foesio.foAuction.utils.InputValidationUtils;
 import me.foesio.foAuction.utils.OwnerMessages;
+import me.foesio.foAuction.utils.SlotUpgradePrompt;
 import me.foesio.foAuction.utils.SoundFeedback;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.sound.FoAdminSounds;
@@ -32,6 +35,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
     private final AuctionSettings settings;
     private final FoMessageService messages;
     private final FoAdminSounds adminSounds;
+    private final SlotUpgradeMenu slotUpgradeMenu;
+    private final SlotPurchaseService slotPurchases;
 
     public AuctionCommand(
             AuctionGuiManager guiManager,
@@ -39,7 +44,9 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
             VaultEconomyBridge economyService,
             AuctionSettings settings,
             FoMessageService messages,
-            FoAdminSounds adminSounds
+            FoAdminSounds adminSounds,
+            SlotUpgradeMenu slotUpgradeMenu,
+            SlotPurchaseService slotPurchases
     ) {
         this.guiManager = guiManager;
         this.auctionService = auctionService;
@@ -47,6 +54,8 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
         this.settings = settings;
         this.messages = messages;
         this.adminSounds = adminSounds;
+        this.slotUpgradeMenu = slotUpgradeMenu;
+        this.slotPurchases = slotPurchases;
     }
 
     private void sendOwnerMessage(CommandSender sender, String path, String... placeholders) {
@@ -73,6 +82,15 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
+            case "slots" -> {
+                if (!(sender instanceof Player player)) {
+                    sendOwnerMessage(sender, "command.only-players-open-gui");
+                    return true;
+                }
+                slotUpgradeMenu.open(player);
+                SoundFeedback.menuOpen(player);
+                return true;
+            }
             case "sell" -> {
                 if (!(sender instanceof Player player)) {
                     sendOwnerMessage(sender, "command.only-players-sell");
@@ -152,6 +170,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                       }
                       case NO_SLOTS -> {
                           sendOwnerMessage(sender, "command.no-slots", "max", String.valueOf(result.maxSlots()));
+                          SlotUpgradePrompt.send(player, result.maxSlots(), slotPurchases, settings, messages);
                           adminSounds.updateError(player);
                       }
                       case BLACKLISTED -> {
@@ -159,6 +178,14 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
                           adminSounds.updateError(player);
                       }
                       case ECONOMY_ERROR -> {
+                          sendOwnerMessage(sender, "command.economy-error");
+                          adminSounds.updateError(player);
+                      }
+                      case CANCELLED -> {
+                          sendOwnerMessage(sender, "command.listing-blocked");
+                          adminSounds.updateError(player);
+                      }
+                      case INVALID_NPC_NAME, STORAGE_ERROR -> {
                           sendOwnerMessage(sender, "command.economy-error");
                           adminSounds.updateError(player);
                       }
@@ -248,7 +275,7 @@ public final class AuctionCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("sell", "claims", "search", "view"), args[0]);
+            return filter(List.of("sell", "claims", "search", "view", "slots"), args[0]);
         }
 
         if (args.length == 2 && "sell".equalsIgnoreCase(args[0])) {

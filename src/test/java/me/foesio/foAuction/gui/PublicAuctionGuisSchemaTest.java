@@ -37,6 +37,19 @@ final class PublicAuctionGuisSchemaTest {
     }
 
     @Test
+    void disabledGemButtonIsInvisibleAndHasNoClickBinding() throws Exception {
+        PublicGuiDefinition definition = load("listings");
+        int slot = definition.buttons().get("buy-slots").slot();
+        PublicGuiFrame frame = PublicGuiPlanner.plan(
+                new GuiSnapshot<>(1L, Map.of("auction.listings", definition)), "auction.listings",
+                new PublicGuiRenderInput(Map.of("page", "1", "max_page", "1"),
+                        Map.of("buy-slots", "gem-disabled"),
+                        Map.of("sort", new PublicGuiText.CycleSelection(List.of("Newest"), 0)), Map.of()));
+        assertFalse(frame.visuals().containsKey(slot));
+        assertFalse(frame.bindings().containsKey(slot));
+    }
+
+    @Test
     void movedControlBindsOnlyTheNewSlot() throws Exception {
         var yaml = StrictGuiYaml.load(Path.of("src/main/resources/guis/main.yml"));
         yaml.set("buttons.claims.slot", 44);

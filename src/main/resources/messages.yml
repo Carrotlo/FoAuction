@@ -79,7 +79,7 @@ validation-errors:
 
 command:
   no-permission: "{prefix}{bad}You do not have permission."
-  usage: "{prefix}Usage: {theme}/{label} [sell <price>|claims|search <text>|view [player]]"
+  usage: "{prefix}Usage: {theme}/{label} [sell <price>|claims|search <text>|view [player]|slots]"
   only-players-open-gui: "{prefix}{bad}Only players can open auction GUI."
   only-players-sell: "{prefix}{bad}Only players can sell items."
   usage-sell: "{prefix}Usage: {theme}/{label} sell <price>"
@@ -90,6 +90,7 @@ command:
   need-fee: "{prefix}{bad}Need {theme}{amount}{muted} to cover listing fee."
   no-slots: "{prefix}{bad}Max active listings reached ({theme}{max}{bad})."
   blacklisted: "{prefix}{bad}That item is blacklisted."
+  listing-blocked: "{prefix}{bad}Another plugin blocked this listing."
   economy-error: "{prefix}{bad}Economy transaction failed."
   only-players-claims: "{prefix}{bad}Only players can open claims."
   only-players-search: "{prefix}{bad}Only players can search auctions."
@@ -101,6 +102,44 @@ command:
   player-not-found: "{prefix}{bad}Could not find player {theme}{player}{bad}."
   invalid-player-name: "{prefix}{bad}Invalid player name: {muted}{error}"
   opening-listings: "{prefix}Opening listings for {theme}{player}{muted}."
+
+slots:
+  version: 4
+  menu-title: "&8Auction Slots"
+  info-name: "&eYour listing slots"
+  info-lore:
+    - "&7Base slots: &f{base}"
+    - "&7Bought slots: &f{bought}/3"
+    - "&7Total slots: &f{total}"
+  buy-name: "&aBuy +1 slot"
+  buy-lore:
+    - "&7Cost: &f{price} {currency}"
+    - "&7Balance: &f{balance} {currency}"
+    - "&eClick to review purchase."
+  confirm-name: "&aConfirm purchase"
+  confirm-lore:
+    - "&7Cost: &f{price} {currency}"
+    - "&eClick to confirm this permanent purchase."
+  max-name: "&aAll upgrades owned"
+  max-lore:
+    - "&7You own all 3 extra slots."
+  unlimited-name: "&aUnlimited listing slots"
+  unlimited-lore:
+    - "&7Your permission grants unlimited listing slots."
+  unavailable-name: "&cPurchases unavailable"
+  unavailable-lore:
+    - "&7Please try again later."
+  back-name: "&cBack to listings"
+  success: "{prefix}{good}Bought one permanent auction slot for {price} {currency}. Total: {total}."
+  maxed: "{prefix}{bad}You already own all 3 extra auction slots."
+  unlimited: "{prefix}{good}You already have unlimited auction slots."
+  insufficient: "{prefix}{bad}You need {price} {currency} for the next slot."
+  unavailable: "{prefix}{bad}Slot purchases are temporarily unavailable."
+  disabled: "{prefix}{bad}Auction slot purchases are disabled."
+  admin-missing-playerpoints: "{prefix}{bad}Auction slot purchases are disabled: PlayerPoints is unavailable. Enable PlayerPoints, then reload FoAuction."
+  error: "{prefix}{bad}Purchase failed. Check your balance; contact staff if you were charged."
+  price-changed: "{prefix}{bad}The slot price changed. Please review it again."
+  no-slots-action: "{good}➜ Click here to buy another auction slot ({price} {currency})."
 
 admin:
   usage: "{prefix}Usage: {theme}/{label} <version|reload|history <player>|editor>"
@@ -150,6 +189,8 @@ gui:
   purchase-partial-claims: "{prefix}{good}Purchase successful. {muted}Some items fit, rest sent to claims."
   insufficient-funds: "{prefix}:redstone: {bad}Not enough money."
   transaction-progress: "{prefix}{bad}Another player is purchasing this item."
+  purchase-blocked: "{prefix}{bad}Another plugin blocked this purchase."
+  admin-virtual-seller: "{prefix}{bad}Virtual sellers have no claims. Use Take to recover this item."
   search-input-error: "{prefix}{bad}Could not open search input."
   no-search-filter: "{prefix}No active search filter."
   claim-item: "{prefix}{good}Item claimed."

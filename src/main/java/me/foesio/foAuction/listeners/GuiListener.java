@@ -8,6 +8,8 @@ import me.foesio.core.gui.publicgui.PublicGuiInventoryHolder;
 import me.foesio.foAuction.gui.AuctionGuiManager;
 import me.foesio.foAuction.gui.AuctionSearchDialog;
 import me.foesio.foAuction.gui.PublicAuctionGuis;
+import me.foesio.foAuction.gui.SlotUpgradeMenu;
+import me.foesio.foAuction.config.AuctionSettings;
 import me.foesio.foAuction.gui.holder.AdminRemoveHolder;
 import me.foesio.foAuction.gui.holder.AuctionMainHolder;
 import me.foesio.foAuction.gui.holder.ClaimHolder;
@@ -17,8 +19,10 @@ import me.foesio.foAuction.gui.holder.HistoryHolder;
 import me.foesio.foAuction.gui.holder.MyListingsHolder;
 import me.foesio.foAuction.gui.holder.SellerViewHolder;
 import me.foesio.foAuction.service.AuctionService;
+import me.foesio.foAuction.service.SlotPurchaseService;
 import me.foesio.foAuction.utils.SoundFeedback;
 import me.foesio.foAuction.utils.InputValidationUtils;
+import me.foesio.foAuction.utils.SlotUpgradePrompt;
 import me.foesio.core.message.FoMessageService;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -48,6 +52,14 @@ public final class GuiListener implements Listener {
     private final Supplier<FoCoreContext> coreProvider;
     private final AuctionSearchDialog dialogTexts;
     private final FoMessageService messages;
+    private final AuctionSettings settings;
+    private SlotUpgradeMenu slotUpgradeMenu;
+    private SlotPurchaseService slotPurchases;
+
+    public void slotUpgradeMenu(SlotUpgradeMenu menu, SlotPurchaseService purchases) {
+        this.slotUpgradeMenu = menu;
+        this.slotPurchases = purchases;
+    }
     private final Map<UUID, Long> refreshCooldownExpiryByPlayer;
     private final Map<UUID, Long> lastGuiActionTime;
     private final Map<UUID, Integer> guiActionCount;
@@ -62,7 +74,8 @@ public final class GuiListener implements Listener {
             AuctionService auctionService,
             Supplier<FoCoreContext> coreProvider,
             AuctionSearchDialog dialogTexts,
-            FoMessageService messages
+            FoMessageService messages,
+            AuctionSettings settings
     ) {
         this.plugin = plugin;
         this.guiManager = guiManager;
@@ -70,6 +83,7 @@ public final class GuiListener implements Listener {
         this.coreProvider = coreProvider;
         this.dialogTexts = dialogTexts;
         this.messages = messages;
+        this.settings = settings;
         this.refreshCooldownExpiryByPlayer = new ConcurrentHashMap<>();
         this.lastGuiActionTime = new ConcurrentHashMap<>();
         this.guiActionCount = new ConcurrentHashMap<>();
@@ -170,6 +184,9 @@ public final class GuiListener implements Listener {
             }
             case "listings.previous", "listings.next", "listings.refresh", "listings.sort", "listings.back" ->
                     browseOwnListings(player, action, page, maxPage);
+            case "listings.buy-slots" -> {
+                if (slotUpgradeMenu != null) slotUpgradeMenu.open(player);
+            }
             case "seller-view.previous", "seller-view.next", "seller-view.refresh", "seller-view.sort",
                  "seller-view.back" -> browseSeller(player, view.sellerUuid(), action, page, maxPage);
             case "claims.claim" -> {
@@ -907,6 +924,10 @@ public final class GuiListener implements Listener {
                     message(player, "gui.admin-insufficient-permission");
                     SoundFeedback.denied(player);
                 }
+                case VIRTUAL_SELLER -> {
+                    message(player, "gui.admin-virtual-seller");
+                    SoundFeedback.denied(player);
+                }
             }
             reopenMain(player, holder.getReturnPage());
             return;
@@ -937,6 +958,10 @@ public final class GuiListener implements Listener {
                 }
                 case INSUFFICIENT_PERMISSION -> {
                     message(player, "gui.admin-insufficient-permission");
+                    SoundFeedback.denied(player);
+                }
+                case VIRTUAL_SELLER -> {
+                    message(player, "gui.admin-virtual-seller");
                     SoundFeedback.denied(player);
                 }
             }
@@ -1094,6 +1119,10 @@ public final class GuiListener implements Listener {
                 message(player, "gui.transaction-progress");
                 SoundFeedback.denied(player);
             }
+            case CANCELLED -> {
+                message(player, "gui.purchase-blocked");
+                SoundFeedback.denied(player);
+            }
         }
     }
 
@@ -1235,6 +1264,7 @@ public final class GuiListener implements Listener {
               }
               case NO_SLOTS -> {
                   message(player, "command.no-slots", "max", result.maxSlots());
+                  SlotUpgradePrompt.send(player, result.maxSlots(), slotPurchases, settings, messages);
                   SoundFeedback.denied(player);
                   player.closeInventory();
               }
@@ -1244,6 +1274,16 @@ public final class GuiListener implements Listener {
                   player.closeInventory();
               }
               case ECONOMY_ERROR -> {
+                  message(player, "command.economy-error");
+                  SoundFeedback.denied(player);
+                  player.closeInventory();
+              }
+              case CANCELLED -> {
+                  message(player, "command.listing-blocked");
+                  SoundFeedback.denied(player);
+                  player.closeInventory();
+              }
+              case INVALID_NPC_NAME, STORAGE_ERROR -> {
                   message(player, "command.economy-error");
                   SoundFeedback.denied(player);
                   player.closeInventory();

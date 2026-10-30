@@ -30,6 +30,10 @@ public final class PlayerNameCache {
         }
     }
 
+    public void rememberVirtual(UUID uuid, String name) {
+        remember(uuid, name);
+    }
+
     public String resolve(UUID uuid) {
         if (uuid == null) {
             return "unknown";

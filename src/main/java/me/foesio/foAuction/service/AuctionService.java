@@ -1,5 +1,11 @@
 package me.foesio.foAuction.service;
 
+import me.foesio.foAuction.api.AuctionListingSnapshot;
+import me.foesio.foAuction.api.event.ListingCreatedEvent;
+import me.foesio.foAuction.api.event.ListingEndedEvent;
+import me.foesio.foAuction.api.event.ListingPreCreateEvent;
+import me.foesio.foAuction.api.event.ListingPrePurchaseEvent;
+import me.foesio.foAuction.api.event.ListingPurchasedEvent;
 import me.foesio.foAuction.config.AuctionSettings;
 import me.foesio.foAuction.model.AuctionListing;
 import me.foesio.foAuction.model.ClaimEntry;
@@ -8,6 +14,7 @@ import me.foesio.foAuction.model.PlayerData;
 import me.foesio.foAuction.model.SoldAuctionHistoryEntry;
 import me.foesio.foAuction.model.SortMode;
 import me.foesio.foAuction.storage.IUserDataRepository;
+import me.foesio.foAuction.storage.NpcSellerRepository;
 import me.foesio.foAuction.FoAuction;
 import me.foesio.foAuction.utils.SoundFeedback;
 import me.foesio.foAuction.utils.ColorPalette;
@@ -23,6 +30,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Container;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
@@ -40,6 +48,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -73,11 +82,14 @@ public final class AuctionService {
     private final PlayerNameCache playerNameCache;
     private final FoMessageService messages;
     private final InventoryDepositService inventoryDeposits;
+    private final SlotPurchaseService slotPurchases;
+    private final NpcSellerRepository npcSellers;
 
     private final Object transactionLock;
     private final Map<UUID, AuctionListing> listingsById;
     private final ConcurrentMap<UUID, String> searchQueryByViewer;
     private final Set<UUID> pendingPurchaseTransactions;
+    private final Set<UUID> pendingListingTransactions;
     private final ConcurrentMap<UUID, Long> claimCooldowns;
     private final ConcurrentMap<UUID, Long> searchQueryTimestamps;
     private static final long CLAIM_COOLDOWN_MS = 1000L; // 1 second cooldown
@@ -91,7 +103,9 @@ public final class AuctionService {
             DiscordWebhookService discordWebhookService,
             PlayerNameCache playerNameCache,
             FoMessageService messages,
-            InventoryDepositService inventoryDeposits
+            InventoryDepositService inventoryDeposits,
+            SlotPurchaseService slotPurchases,
+            NpcSellerRepository npcSellers
     ) {
         this.plugin = plugin;
         this.userDataRepository = userDataRepository;
@@ -101,10 +115,13 @@ public final class AuctionService {
         this.playerNameCache = playerNameCache;
         this.messages = messages;
         this.inventoryDeposits = inventoryDeposits;
+        this.slotPurchases = slotPurchases;
+        this.npcSellers = npcSellers;
         this.transactionLock = new Object();
         this.listingsById = new HashMap<>();
         this.searchQueryByViewer = new ConcurrentHashMap<>();
         this.pendingPurchaseTransactions = ConcurrentHashMap.newKeySet();
+        this.pendingListingTransactions = ConcurrentHashMap.newKeySet();
         this.claimCooldowns = new ConcurrentHashMap<>();
         this.searchQueryTimestamps = new ConcurrentHashMap<>();
     }
@@ -353,6 +370,29 @@ public final class AuctionService {
         }
     }
 
+    public List<AuctionListing> getActiveListingsPage(int offset, int limit) {
+        long now = System.currentTimeMillis();
+        synchronized (transactionLock) {
+            return listingsById.values().stream()
+                    .filter(listing -> !listing.isExpired(now))
+                    .sorted(comparatorFor(SortMode.NEWEST))
+                    .skip(offset)
+                    .limit(limit)
+                    .map(AuctionListing::copy)
+                    .toList();
+        }
+    }
+
+    public AuctionListingSnapshot toSnapshot(AuctionListing listing) {
+        return snapshot(listing);
+    }
+
+    private AuctionListingSnapshot snapshot(AuctionListing listing) {
+        return new AuctionListingSnapshot(listing.getId(), listing.getSellerUuid(), listing.getItem(),
+                listing.getPrice(), listing.getCreatedAt(), listing.getExpiresAt(),
+                resolvePlayerName(listing.getSellerUuid()), npcSellers.isNpc(listing.getSellerUuid()));
+    }
+
     public List<ClaimEntry> getClaims(UUID playerUuid) {
         PlayerData playerData = userDataRepository.getOrCreate(playerUuid);
         return playerData.getClaims().stream()
@@ -445,13 +485,27 @@ public final class AuctionService {
     }
 
     public SellResult createListing(Player player, double price) {
+        return createPlayerListing(player, null, price, true);
+    }
+
+    /** API-supplied item: the caller, rather than FoAuction, owns removal from its source. */
+    public SellResult createListingForPlayer(Player player, ItemStack suppliedItem, double price) {
+        return createPlayerListing(player, suppliedItem, price, false);
+    }
+
+    private SellResult createPlayerListing(Player player, ItemStack suppliedItem, double price,
+                                           boolean takeMainHand) {
         if (!Double.isFinite(price) || price < settings.getMinPrice() || price > settings.getMaxPrice()) {
             return SellResult.priceOutOfRange(settings.getMinPrice(), settings.getMaxPrice());
         }
 
-        synchronized (transactionLock) {
-            ItemStack inHand = player.getInventory().getItemInMainHand();
-            if (inHand.getType().isAir()) {
+        if (!pendingListingTransactions.add(player.getUniqueId())) {
+            return SellResult.cancelled();
+        }
+        try {
+            synchronized (transactionLock) {
+            ItemStack inHand = takeMainHand ? player.getInventory().getItemInMainHand() : suppliedItem;
+            if (inHand == null || inHand.getType().isAir() || inHand.getAmount() <= 0) {
                 return SellResult.noItem();
             }
 
@@ -466,6 +520,9 @@ public final class AuctionService {
             }
 
             double listingFee = price * (settings.getListingFeePercent() / 100D);
+            if (!Double.isFinite(listingFee) || listingFee < 0D) {
+                return SellResult.priceOutOfRange(settings.getMinPrice(), settings.getMaxPrice());
+            }
             double requiredUpfrontBalance = listingFee;
             if (requiredUpfrontBalance > 0D && !economyService.has(player, requiredUpfrontBalance)) {
                 return SellResult.insufficientFunds(requiredUpfrontBalance);
@@ -474,13 +531,36 @@ public final class AuctionService {
             // Create a snapshot of item to prevent modification during transaction
             ItemStack itemSnapshot = inHand.clone();
 
+            ListingPreCreateEvent preEvent = new ListingPreCreateEvent(player.getUniqueId(), player,
+                    itemSnapshot, price);
+            if (!dispatchPreEvent(preEvent) || preEvent.isCancelled()) {
+                return SellResult.cancelled();
+            }
+            if (!player.isOnline()) return SellResult.cancelled();
+            if (takeMainHand && !itemSnapshot.equals(player.getInventory().getItemInMainHand())) {
+                return SellResult.noItem();
+            }
+            if (isBlacklistedForListing(itemSnapshot)) return SellResult.blacklisted();
+            if (price < settings.getMinPrice() || price > settings.getMaxPrice()) {
+                return SellResult.priceOutOfRange(settings.getMinPrice(), settings.getMaxPrice());
+            }
+            maxSlots = resolveMaxSlots(player);
+            if (sellerData.getAuctions().size() >= maxSlots) {
+                return SellResult.noSlots(maxSlots);
+            }
+            if (requiredUpfrontBalance > 0D && !economyService.has(player, requiredUpfrontBalance)) {
+                return SellResult.insufficientFunds(requiredUpfrontBalance);
+            }
+
             // Withdraw fee first - if this fails, we don't proceed
             if (listingFee > 0D && !economyService.withdraw(player, listingFee)) {
                 return SellResult.economyFailed();
             }
 
             // Remove item from hand immediately after successful fee withdrawal
-            player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+            if (takeMainHand) {
+                player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+            }
 
             long now = System.currentTimeMillis();
             long expireTime = now + settings.getExpireMillis();
@@ -498,6 +578,9 @@ public final class AuctionService {
             listingsById.put(listing.getId(), listing.copy());
 
             userDataRepository.saveNow(player.getUniqueId());
+
+            dispatchPostEvent(new ListingCreatedEvent(
+                    snapshot(listing), listingFee));
 
             discordWebhookService.send(
                     DiscordWebhookService.EventType.LISTING,
@@ -518,6 +601,64 @@ public final class AuctionService {
                             + "."
             );
             return SellResult.success(listing, maxSlots);
+            }
+        } finally {
+            pendingListingTransactions.remove(player.getUniqueId());
+        }
+    }
+
+    /** Creates a virtual-seller listing. The caller supplies and owns the source item. */
+    public SellResult createListingForNpc(String npcName, ItemStack suppliedItem, double price) {
+        String validName;
+        UUID sellerId;
+        try {
+            validName = NpcSellerRepository.validateName(npcName);
+            sellerId = NpcSellerRepository.idForName(validName);
+        } catch (IllegalArgumentException exception) {
+            return SellResult.invalidNpcName();
+        }
+        if (!Double.isFinite(price) || price < settings.getMinPrice() || price > settings.getMaxPrice()) {
+            return SellResult.priceOutOfRange(settings.getMinPrice(), settings.getMaxPrice());
+        }
+        if (suppliedItem == null || suppliedItem.getType().isAir() || suppliedItem.getAmount() <= 0) {
+            return SellResult.noItem();
+        }
+        if (!pendingListingTransactions.add(sellerId)) return SellResult.cancelled();
+        try {
+            synchronized (transactionLock) {
+                ItemStack itemSnapshot = suppliedItem.clone();
+                if (isBlacklistedForListing(itemSnapshot)) return SellResult.blacklisted();
+
+                ListingPreCreateEvent preEvent = new ListingPreCreateEvent(sellerId, null,
+                        itemSnapshot, price);
+                if (!dispatchPreEvent(preEvent) || preEvent.isCancelled()) return SellResult.cancelled();
+                if (isBlacklistedForListing(itemSnapshot)) return SellResult.blacklisted();
+                if (price < settings.getMinPrice() || price > settings.getMaxPrice()) {
+                    return SellResult.priceOutOfRange(settings.getMinPrice(), settings.getMaxPrice());
+                }
+
+                try {
+                    npcSellers.register(validName);
+                } catch (SQLException exception) {
+                    plugin.getLogger().warning("Could not persist NPC seller identity: " + exception.getMessage());
+                    return SellResult.storageFailed();
+                }
+                playerNameCache.rememberVirtual(sellerId, validName);
+                long now = System.currentTimeMillis();
+                AuctionListing listing = new AuctionListing(UUID.randomUUID(), sellerId, itemSnapshot,
+                        price, now, now + settings.getExpireMillis());
+                userDataRepository.getOrCreate(sellerId).getAuctions().add(listing);
+                listingsById.put(listing.getId(), listing.copy());
+                userDataRepository.saveNow(sellerId);
+                dispatchPostEvent(new ListingCreatedEvent(snapshot(listing), 0D));
+                discordWebhookService.send(DiscordWebhookService.EventType.LISTING,
+                        validName + " listed " + resolveItemName(itemSnapshot) + " for "
+                                + formatEconomyPrice(price) + ".");
+                FoAuction.fileLogger().info("NPC listing created: " + listing.getId() + " seller=" + validName + ".");
+                return SellResult.success(listing, 0);
+            }
+        } finally {
+            pendingListingTransactions.remove(sellerId);
         }
     }
 
@@ -554,6 +695,25 @@ public final class AuctionService {
                     return PurchaseResult.INSUFFICIENT_FUNDS;
                 }
 
+                ListingPrePurchaseEvent preEvent = new ListingPrePurchaseEvent(buyer,
+                        snapshot(listing));
+                if (!dispatchPreEvent(preEvent) || preEvent.isCancelled()) {
+                    return PurchaseResult.CANCELLED;
+                }
+                if (listingsById.get(listingId) != listing) {
+                    return PurchaseResult.NOT_FOUND;
+                }
+                if (listing.isExpired(System.currentTimeMillis())) {
+                    expireListingInternal(listing, false);
+                    return PurchaseResult.EXPIRED;
+                }
+                if (!buyer.isOnline()) {
+                    return PurchaseResult.CANCELLED;
+                }
+                if (!economyService.has(buyer, listingPrice)) {
+                    return PurchaseResult.INSUFFICIENT_FUNDS;
+                }
+
                 // Critical: Remove listing from market before processing economy
                 // This prevents double-spending if economy operations fail
                 removeListingInternal(listing);
@@ -566,8 +726,9 @@ public final class AuctionService {
                 }
 
                 double sellerPayout = listingPrice;
-                OfflinePlayer seller = Bukkit.getOfflinePlayer(listing.getSellerUuid());
-                if (!economyService.deposit(seller, sellerPayout)) {
+                boolean virtualSeller = npcSellers.isNpc(listing.getSellerUuid());
+                OfflinePlayer seller = virtualSeller ? null : Bukkit.getOfflinePlayer(listing.getSellerUuid());
+                if (!virtualSeller && !economyService.deposit(seller, sellerPayout)) {
                     boolean refunded = economyService.deposit(buyer, listingPrice);
                     restoreListingInternal(listing);
                       if (!refunded) {
@@ -592,9 +753,13 @@ public final class AuctionService {
                         "@foauction:purchased-from:" + listing.getSellerUuid()
                 );
                 recordSoldListingInternal(listing, buyer.getUniqueId(), System.currentTimeMillis());
-                notifySellerOfSale(listing, buyer);
+                if (!virtualSeller) notifySellerOfSale(listing, buyer);
                 userDataRepository.saveNow(listing.getSellerUuid());
                 userDataRepository.saveNow(buyer.getUniqueId());
+
+                dispatchPostEvent(new ListingPurchasedEvent(
+                        snapshot(listing), buyer.getUniqueId(),
+                        ListingPurchasedEvent.Delivery.valueOf(buyerDelivery.name())));
 
                 String sellerName = resolvePlayerName(listing.getSellerUuid());
                 String buyerDeliveryDescription = switch (buyerDelivery) {
@@ -613,7 +778,8 @@ public final class AuctionService {
                                 + formatEconomyPrice(listingPrice)
                                 + ". "
                                 + buyerDeliveryDescription
-                                + "; seller payout was deposited directly."
+                                + (virtualSeller ? "; payment left circulation."
+                                        : "; seller payout was deposited directly.")
                 );
                 FoAuction.fileLogger().info(
                         "Listing sold: "
@@ -657,6 +823,10 @@ public final class AuctionService {
             player.getInventory().addItem(listing.getItem().clone());
             userDataRepository.saveNow(player.getUniqueId());
 
+            dispatchPostEvent(new ListingEndedEvent(
+                    snapshot(listing), ListingEndedEvent.Reason.SELLER_CANCELLED,
+                    player.getUniqueId()));
+
             discordWebhookService.send(
                     DiscordWebhookService.EventType.CANCELLING_LISTINGS,
                     player.getName()
@@ -689,6 +859,10 @@ public final class AuctionService {
                 return AdminActionResult.NOT_FOUND;
             }
 
+            if (npcSellers.isNpc(listing.getSellerUuid())) {
+                return AdminActionResult.VIRTUAL_SELLER;
+            }
+
             // Final permission check inside synchronized block
             if (!admin.hasPermission("foauction.admin") || !admin.hasPermission("foauction.admin.return")) {
                 return AdminActionResult.NO_PERMISSION;
@@ -697,6 +871,10 @@ public final class AuctionService {
             removeListingInternal(listing);
             addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "@foauction:admin-removed");
             userDataRepository.saveNow(listing.getSellerUuid());
+
+            dispatchPostEvent(new ListingEndedEvent(
+                    snapshot(listing), ListingEndedEvent.Reason.ADMIN_RETURNED,
+                    admin.getUniqueId()));
 
             Player seller = Bukkit.getPlayer(listing.getSellerUuid());
             if (seller != null) {
@@ -756,6 +934,9 @@ public final class AuctionService {
             DeliveryType deliveryType = deliverItemToPlayerOrClaims(admin.getUniqueId(), admin, listing.getItem());
             userDataRepository.saveNow(listing.getSellerUuid());
             userDataRepository.saveNow(admin.getUniqueId());
+            dispatchPostEvent(new ListingEndedEvent(
+                    snapshot(listing), ListingEndedEvent.Reason.ADMIN_TAKEN,
+                    admin.getUniqueId()));
             discordWebhookService.send(
                     DiscordWebhookService.EventType.ADMIN_REMOVING,
                     admin.getName()
@@ -793,11 +974,17 @@ public final class AuctionService {
                     .filter(listing -> listing.isExpired(now))
                     .map(AuctionListing::copy)
                     .toList();
+            int expiredCount = 0;
             for (AuctionListing listing : expired) {
-                expireListingInternal(listing, true);
+                // An earlier end-event listener may have taken another listing from this batch.
+                AuctionListing current = listingsById.get(listing.getId());
+                if (current != null && current.isExpired(System.currentTimeMillis())) {
+                    expireListingInternal(current, true);
+                    expiredCount++;
+                }
             }
 
-            return expired.size();
+            return expiredCount;
         }
     }
 
@@ -828,7 +1015,12 @@ public final class AuctionService {
             }
         }
 
-        return highest > 0 ? highest : settings.getDefaultMaxSlots();
+        int baseline = highest > 0 ? highest : settings.getDefaultMaxSlots();
+        return addPurchasedSlots(baseline, slotPurchases.purchased(player.getUniqueId()));
+    }
+
+    public static int addPurchasedSlots(int baseline, int purchased) {
+        return baseline >= Integer.MAX_VALUE - purchased ? Integer.MAX_VALUE : baseline + purchased;
     }
 
     public int getSellLimit(OfflinePlayer player) {
@@ -840,7 +1032,7 @@ public final class AuctionService {
         if (onlinePlayer != null && onlinePlayer.isOnline()) {
             return resolveMaxSlots(onlinePlayer);
         }
-        return settings.getDefaultMaxSlots();
+        return addPurchasedSlots(settings.getDefaultMaxSlots(), slotPurchases.purchased(player.getUniqueId()));
     }
 
     public int getSellCount(UUID playerUuid) {
@@ -944,20 +1136,50 @@ public final class AuctionService {
 
     private void expireListingInternal(AuctionListing listing, boolean notifyPlayer) {
         removeListingInternal(listing);
-        addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "@foauction:listing-expired");
+        boolean virtualSeller = npcSellers.isNpc(listing.getSellerUuid());
+        if (!virtualSeller) {
+            addItemClaimInternal(listing.getSellerUuid(), listing.getItem(), "@foauction:listing-expired");
+        }
         userDataRepository.saveNow(listing.getSellerUuid());
 
+        dispatchPostEvent(new ListingEndedEvent(
+                snapshot(listing), ListingEndedEvent.Reason.EXPIRED, null));
+
+
         Player seller = Bukkit.getPlayer(listing.getSellerUuid());
-        if (notifyPlayer && seller != null) {
+        if (!virtualSeller && notifyPlayer && seller != null) {
             sendOwnerMessage(seller, "auction.expired-notification");
             SoundFeedback.listingExpired(seller);
         }
 
         discordWebhookService.send(
                 DiscordWebhookService.EventType.CLAIMS,
-                "Expired listing item sent to seller claims: " + resolveItemName(listing.getItem()) + "."
+                (virtualSeller ? "Expired NPC listing item discarded: "
+                        : "Expired listing item sent to seller claims: ")
+                        + resolveItemName(listing.getItem()) + "."
         );
-        FoAuction.fileLogger().info("Listing expired and moved to seller claims: " + listing.getId() + ".");
+        FoAuction.fileLogger().info((virtualSeller ? "NPC listing expired and item discarded: "
+                : "Listing expired and moved to seller claims: ") + listing.getId() + ".");
+    }
+
+    private boolean dispatchPreEvent(Event event) {
+        try {
+            Bukkit.getPluginManager().callEvent(event);
+            return true;
+        } catch (RuntimeException | LinkageError exception) {
+            plugin.getLogger().warning("Could not dispatch " + event.getEventName()
+                    + "; auction action was stopped: " + exception.getMessage());
+            return false;
+        }
+    }
+
+    private void dispatchPostEvent(Event event) {
+        try {
+            Bukkit.getPluginManager().callEvent(event);
+        } catch (RuntimeException | LinkageError exception) {
+            plugin.getLogger().warning("Could not dispatch " + event.getEventName()
+                    + " after auction action: " + exception.getMessage());
+        }
     }
 
     private void removeListingInternal(AuctionListing listing) {
@@ -1458,7 +1680,8 @@ public final class AuctionService {
         EXPIRED,
         NOT_FOUND,
         ECONOMY_ERROR,
-        TRANSACTION_IN_PROGRESS
+        TRANSACTION_IN_PROGRESS,
+        CANCELLED
     }
 
     public enum CancelResult {
@@ -1474,7 +1697,8 @@ public final class AuctionService {
         SUCCESS_ADMIN_CLAIMS,
         NOT_FOUND,
         NO_PERMISSION,
-        INSUFFICIENT_PERMISSION
+        INSUFFICIENT_PERMISSION,
+        VIRTUAL_SELLER
     }
 
     public record SellResult(
@@ -1513,6 +1737,18 @@ public final class AuctionService {
             return new SellResult(Type.ECONOMY_ERROR, null, 0D, 0D, 0D, 0);
         }
 
+        public static SellResult cancelled() {
+            return new SellResult(Type.CANCELLED, null, 0D, 0D, 0D, 0);
+        }
+
+        public static SellResult invalidNpcName() {
+            return new SellResult(Type.INVALID_NPC_NAME, null, 0D, 0D, 0D, 0);
+        }
+
+        public static SellResult storageFailed() {
+            return new SellResult(Type.STORAGE_ERROR, null, 0D, 0D, 0D, 0);
+        }
+
         public enum Type {
             SUCCESS,
             NO_ITEM,
@@ -1520,7 +1756,10 @@ public final class AuctionService {
             INSUFFICIENT_FUNDS,
             NO_SLOTS,
             BLACKLISTED,
-            ECONOMY_ERROR
+            ECONOMY_ERROR,
+            CANCELLED,
+            INVALID_NPC_NAME,
+            STORAGE_ERROR
         }
     }
 

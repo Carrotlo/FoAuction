@@ -79,11 +79,17 @@ Requires PlaceholderAPI.
 
 Main config areas: `file-logging`, `native-dialogs`, `auction`, `gui`, `blacklisted-items`, `discord-webhook`, `history`.
 
+Permanent auction slot purchases use `auction.gem-slots.enabled` (default `false`). Existing
+configs gain this setting as `false` without changing other values. Set it to `true` and reload
+FoAuction to allow new purchases through PlayerPoints. If PlayerPoints is unavailable, the shop
+stays disabled and admins receive a warning on join or `/foauctionadmin reload`. Purchased slots
+remain active when the shop is disabled.
+
 </details>
 
 <details>
 <summary><strong>Developer API</strong></summary>
 
-This plugin does not expose a public developer API.
+FoAuction exposes a Java API for listing queries and player/NPC listing creation, plus Bukkit events for listing creation, purchase, and ending. See [public API source](src/main/java/me/foesio/foAuction/api) for discovery, contracts, and examples.
 
 </details>

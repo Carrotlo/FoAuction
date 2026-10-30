@@ -26,6 +26,13 @@ auction:
   listing-fee-percent: 0
   # Default active listing slots when player has no foauction.slots.<amount> permission.
   default-max-slots: 3
+  # Permanent purchased slots add to the highest foauction.slots.<amount> permission.
+  # Purchases are stored separately in entitlements.db and survive userdata.db resets.
+  gem-slots:
+    # Allow new permanent slot purchases with PlayerPoints. Existing purchases remain active when off.
+    enabled: false
+    prices: [400, 650, 1000]
+    currency-name: Coins
   # Listings expire after this many days. Valid range: 1-30.
   expire-days: 7
 

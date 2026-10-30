@@ -5,11 +5,11 @@ api-version: '1.21'
 authors: [ Carrotio ]
 description: Auction House
 depend: [Vault]
-softdepend: [PlaceholderAPI]
+softdepend: [PlaceholderAPI, PlayerPoints]
 commands:
   auction:
     description: Main FoAuction command
-    usage: /<command> [sell <price>|claims|search <text>|view [player]]
+    usage: /<command> [sell <price>|claims|search <text>|view [player]|slots]
     aliases: [foauction, ah]
   foauctionadmin:
     description: FoAuction admin command

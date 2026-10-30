@@ -64,6 +64,26 @@ buttons:
       - "HIDE_ATTRIBUTES"
       - "HIDE_ENCHANTS"
     action: "listings.refresh"
+  buy-slots:
+    slot: 50
+    enabled: true
+    material: "EMERALD"
+    name: "{theme}&lMORE LISTING SLOTS"
+    lore:
+      - "&8ʙᴜᴛᴛᴏɴ"
+      - " "
+      - "&eⓘ Information ↓"
+      - "&7&l | &fUnlock permanent extra listing slots."
+      - " "
+      - "{good}→ Click to View Upgrades ←"
+    glow: true
+    item-flags:
+      - "HIDE_ATTRIBUTES"
+    action: "listings.buy-slots"
+    states:
+      gem-disabled:
+        visible: false
+        clickable: false
 entries:
   listings:
     slots:

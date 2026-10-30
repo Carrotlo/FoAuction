@@ -13,27 +13,34 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public final class PlayerDataListener implements Listener {
     private final IUserDataRepository userDataRepository;
     private final AuctionService auctionService;
     private final PlayerNameCache playerNameCache;
     private final FoScheduler scheduler;
+    private final Consumer<Player> adminJoinNotice;
 
     public PlayerDataListener(
             IUserDataRepository userDataRepository,
             AuctionService auctionService,
             PlayerNameCache playerNameCache,
-            FoScheduler scheduler
+            FoScheduler scheduler,
+            Consumer<Player> adminJoinNotice
     ) {
         this.userDataRepository = userDataRepository;
         this.auctionService = auctionService;
         this.playerNameCache = playerNameCache;
         this.scheduler = scheduler;
+        this.adminJoinNotice = adminJoinNotice;
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerJoin(PlayerJoinEvent event) {
+        scheduler.runForPlayer(event.getPlayer(), () -> {
+            if (event.getPlayer().isOnline()) adminJoinNotice.accept(event.getPlayer());
+        });
         UUID playerUuid = event.getPlayer().getUniqueId();
         playerNameCache.remember(event.getPlayer());
         userDataRepository.loadAndCacheAsync(playerUuid, ignored -> scheduler.runForPlayer(event.getPlayer(), () -> {

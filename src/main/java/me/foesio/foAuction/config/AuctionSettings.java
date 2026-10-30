@@ -27,6 +27,9 @@ public final class AuctionSettings {
     private double maxPrice;
     private double listingFeePercent;
     private int defaultMaxSlots;
+    private boolean gemSlotsEnabled;
+    private List<Integer> gemSlotPrices;
+    private String gemCurrencyName;
     private long guiRefreshCooldownMillis;
     private boolean confirmationGuiEnabled;
     private boolean compactPriceFormatEnabled;
@@ -89,6 +92,18 @@ public final class AuctionSettings {
 
     public int getDefaultMaxSlots() {
         return defaultMaxSlots;
+    }
+
+    public List<Integer> getGemSlotPrices() {
+        return gemSlotPrices;
+    }
+
+    public boolean isGemSlotsEnabled() {
+        return gemSlotsEnabled;
+    }
+
+    public String getGemCurrencyName() {
+        return gemCurrencyName;
     }
 
     public long getGuiRefreshCooldownMillis() {
@@ -196,6 +211,9 @@ public final class AuctionSettings {
         config.addDefault("auction.max-price", ABSOLUTE_MAX_PRICE);
         config.addDefault("auction.listing-fee-percent", 0D);
         config.addDefault("auction.default-max-slots", 3);
+        config.addDefault("auction.gem-slots.enabled", false);
+        config.addDefault("auction.gem-slots.prices", List.of(400, 650, 1000));
+        config.addDefault("auction.gem-slots.currency-name", "Coins");
         config.addDefault("auction.expire-days", FIXED_EXPIRE_DAYS);
         config.addDefault("gui.refresh-cooldown-millis", 500L);
         config.addDefault("gui.confirmation-gui-enabled", true);
@@ -301,6 +319,14 @@ public final class AuctionSettings {
         // Slots validation
         defaultMaxSlots = Math.max(1, config.getInt("auction.default-max-slots", 3));
         config.set("auction.default-max-slots", defaultMaxSlots);
+        // Persist the new switch in older config.yml files without changing an owner's true value.
+        backfillGemSlotSwitch(config);
+        gemSlotsEnabled = config.getBoolean("auction.gem-slots.enabled", false);
+        List<Integer> configuredPrices = config.getIntegerList("auction.gem-slots.prices");
+        gemSlotPrices = configuredPrices.size() == 3 && configuredPrices.stream().allMatch(price -> price > 0)
+                ? List.copyOf(configuredPrices) : List.of(400, 650, 1000);
+        gemCurrencyName = config.getString("auction.gem-slots.currency-name", "Coins").trim();
+        if (gemCurrencyName.isEmpty()) gemCurrencyName = "Coins";
 
         // Cooldown validation
         guiRefreshCooldownMillis = Math.max(0L, config.getLong("gui.refresh-cooldown-millis", 500L));
@@ -349,5 +375,9 @@ public final class AuctionSettings {
         discordWebhookClaimsEnabled = config.getBoolean("discord-webhook.claims", true);
         discordWebhookCancellingListingsEnabled = config.getBoolean("discord-webhook.cancelling-listings", true);
         discordWebhookClaimingListingsEnabled = config.getBoolean("discord-webhook.claiming-listings", false);
+    }
+
+    static void backfillGemSlotSwitch(FileConfiguration config) {
+        if (!config.isSet("auction.gem-slots.enabled")) config.set("auction.gem-slots.enabled", false);
     }
 }
